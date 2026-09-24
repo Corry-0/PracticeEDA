@@ -1,0 +1,157 @@
+{
+  "format": "PracticeEDA.logic",
+  "version": 1,
+  "name": "8 位总线与上升沿寄存器",
+  "main": "main",
+  "nextId": 10,
+  "circuits": [
+    {
+      "name": "main",
+      "parts": [
+        {
+          "id": "p1",
+          "kind": "Input",
+          "label": "Data",
+          "circuit": "",
+          "at": [
+            140,
+            130
+          ],
+          "width": 8,
+          "value": 37,
+          "data": []
+        },
+        {
+          "id": "p2",
+          "kind": "Clock",
+          "label": "CLK",
+          "circuit": "",
+          "at": [
+            140,
+            340
+          ],
+          "width": 1,
+          "value": 0,
+          "data": []
+        },
+        {
+          "id": "p3",
+          "kind": "Register",
+          "label": "8-bit Register",
+          "circuit": "",
+          "at": [
+            450,
+            140
+          ],
+          "width": 8,
+          "value": 0,
+          "data": []
+        },
+        {
+          "id": "p4",
+          "kind": "Output",
+          "label": "Q",
+          "circuit": "",
+          "at": [
+            750,
+            140
+          ],
+          "width": 8,
+          "value": 0,
+          "data": []
+        },
+        {
+          "id": "p5",
+          "kind": "Hex",
+          "label": "Hex display",
+          "circuit": "",
+          "at": [
+            750,
+            340
+          ],
+          "width": 8,
+          "value": 0,
+          "data": []
+        }
+      ],
+      "nodes": [],
+      "wires": [
+        {
+          "id": "w6",
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "p3",
+            "D"
+          ],
+          "bends": [
+            [
+              300,
+              130
+            ],
+            [
+              300,
+              130
+            ]
+          ]
+        },
+        {
+          "id": "w7",
+          "a": [
+            "p2",
+            "Y"
+          ],
+          "b": [
+            "p3",
+            "CLK"
+          ],
+          "bends": [
+            [
+              280,
+              340
+            ],
+            [
+              280,
+              150
+            ]
+          ]
+        },
+        {
+          "id": "w8",
+          "a": [
+            "p3",
+            "Q"
+          ],
+          "b": [
+            "p4",
+            "A"
+          ],
+          "bends": []
+        },
+        {
+          "id": "w9",
+          "a": [
+            "p3",
+            "Q"
+          ],
+          "b": [
+            "p5",
+            "A"
+          ],
+          "bends": [
+            [
+              600,
+              140
+            ],
+            [
+              600,
+              340
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "vs2022-x64",
+      "displayName": "Visual Studio 2022 x64",
+      "description": "Generate build/PracticeEDA.sln with header/source filters",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": { "EDA_BUILD_GUI": "ON", "BUILD_TESTING": "ON" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug", "configurePreset": "vs2022-x64", "configuration": "Debug" },
+    { "name": "release", "configurePreset": "vs2022-x64", "configuration": "Release" }
+  ],
+  "testPresets": [
+    { "name": "debug", "configurePreset": "vs2022-x64", "configuration": "Debug", "output": { "outputOnFailure": true } },
+    { "name": "release", "configurePreset": "vs2022-x64", "configuration": "Release", "output": { "outputOnFailure": true } }
+  ]
+}

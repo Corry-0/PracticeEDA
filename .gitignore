@@ -1,0 +1,16 @@
+/build*/
+/dist/
+*.user
+*.tmp-*
+/.vs/
+/out/
+/CMakeUserPresets.json
+
+# Local credentials and Python caches must not enter public source history.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+__pycache__/
+*.pyc

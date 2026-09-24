@@ -1,0 +1,360 @@
+{
+  "circuits": [
+    {
+      "name": "main",
+      "parts": [
+        {
+          "id": "p13",
+          "kind": "Input",
+          "label": "A",
+          "circuit": "",
+          "at": [
+            140,
+            130
+          ],
+          "width": 1,
+          "value": 0,
+          "data": []
+        },
+        {
+          "id": "p14",
+          "kind": "Input",
+          "label": "B",
+          "circuit": "",
+          "at": [
+            140,
+            350
+          ],
+          "width": 1,
+          "value": 0,
+          "data": []
+        },
+        {
+          "id": "p15",
+          "kind": "Subcircuit",
+          "label": "HalfAdder instance",
+          "circuit": "HalfAdder",
+          "at": [
+            450,
+            240
+          ],
+          "width": 1,
+          "value": 0,
+          "data": []
+        },
+        {
+          "id": "p16",
+          "kind": "Output",
+          "label": "Sum",
+          "circuit": "",
+          "at": [
+            750,
+            130
+          ],
+          "width": 1,
+          "value": 0,
+          "data": []
+        },
+        {
+          "id": "p17",
+          "kind": "Output",
+          "label": "Carry",
+          "circuit": "",
+          "at": [
+            750,
+            350
+          ],
+          "width": 1,
+          "value": 0,
+          "data": []
+        }
+      ],
+      "nodes": [],
+      "wires": [
+        {
+          "id": "w18",
+          "a": [
+            "p13",
+            "Y"
+          ],
+          "b": [
+            "p15",
+            "p1"
+          ],
+          "bends": [
+            [
+              280,
+              130
+            ],
+            [
+              280,
+              230
+            ]
+          ]
+        },
+        {
+          "id": "w19",
+          "a": [
+            "p14",
+            "Y"
+          ],
+          "b": [
+            "p15",
+            "p2"
+          ],
+          "bends": [
+            [
+              280,
+              350
+            ],
+            [
+              280,
+              250
+            ]
+          ]
+        },
+        {
+          "id": "w20",
+          "a": [
+            "p15",
+            "p5"
+          ],
+          "b": [
+            "p16",
+            "A"
+          ],
+          "bends": [
+            [
+              620,
+              230
+            ],
+            [
+              620,
+              130
+            ]
+          ]
+        },
+        {
+          "id": "w21",
+          "a": [
+            "p15",
+            "p6"
+          ],
+          "b": [
+            "p17",
+            "A"
+          ],
+          "bends": [
+            [
+              620,
+              250
+            ],
+            [
+              620,
+              350
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "HalfAdder",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            130.0,
+            140.0
+          ],
+          "circuit": "",
+          "data": [],
+          "id": "p1",
+          "kind": "Input",
+          "label": "A",
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            130.0,
+            340.0
+          ],
+          "circuit": "",
+          "data": [],
+          "id": "p2",
+          "kind": "Input",
+          "label": "B",
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            410.0,
+            130.0
+          ],
+          "circuit": "",
+          "data": [],
+          "id": "p3",
+          "kind": "Xor",
+          "label": "XOR",
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            410.0,
+            350.0
+          ],
+          "circuit": "",
+          "data": [],
+          "id": "p4",
+          "kind": "And",
+          "label": "AND",
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            670.0,
+            130.0
+          ],
+          "circuit": "",
+          "data": [],
+          "id": "p5",
+          "kind": "Output",
+          "label": "Sum",
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            670.0,
+            350.0
+          ],
+          "circuit": "",
+          "data": [],
+          "id": "p6",
+          "kind": "Output",
+          "label": "Carry",
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "wires": [
+        {
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "p3",
+            "A"
+          ],
+          "bends": [
+            [
+              240.0,
+              140.0
+            ],
+            [
+              240.0,
+              120.0
+            ]
+          ],
+          "id": "w7"
+        },
+        {
+          "a": [
+            "p2",
+            "Y"
+          ],
+          "b": [
+            "p3",
+            "B"
+          ],
+          "bends": [
+            [
+              280.0,
+              340.0
+            ],
+            [
+              280.0,
+              140.0
+            ]
+          ],
+          "id": "w8"
+        },
+        {
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "p4",
+            "A"
+          ],
+          "bends": [
+            [
+              240.0,
+              140.0
+            ],
+            [
+              240.0,
+              340.0
+            ]
+          ],
+          "id": "w9"
+        },
+        {
+          "a": [
+            "p2",
+            "Y"
+          ],
+          "b": [
+            "p4",
+            "B"
+          ],
+          "bends": [
+            [
+              280.0,
+              340.0
+            ],
+            [
+              280.0,
+              360.0
+            ]
+          ],
+          "id": "w10"
+        },
+        {
+          "a": [
+            "p3",
+            "Y"
+          ],
+          "b": [
+            "p5",
+            "A"
+          ],
+          "bends": [],
+          "id": "w11"
+        },
+        {
+          "a": [
+            "p4",
+            "Y"
+          ],
+          "b": [
+            "p6",
+            "A"
+          ],
+          "bends": [],
+          "id": "w12"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "半加器子电路复用",
+  "nextId": 22,
+  "version": 1
+}

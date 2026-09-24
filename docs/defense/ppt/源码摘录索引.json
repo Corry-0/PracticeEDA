@@ -1,0 +1,104 @@
+{
+  "part": {
+    "file": "include/Digital.h",
+    "line": 13,
+    "end": 20,
+    "code": "struct Part {\n    // circuit is used only by Subcircuit; value/data are reset values, never live simulation state.\n    std::string id, kind = \"And\", label, circuit;\n    Point at;\n    int width = 1;\n    uint32_t value = 0;\n    std::vector<uint32_t> data;\n};"
+  },
+  "endpoint": {
+    "file": "include/LogicSupport.h",
+    "line": 30,
+    "end": 35,
+    "code": "struct Endpoint {\n    // An empty pin names a junction; a nonempty pin is the stable port ID on a part.\n    std::string object, pin;\n    std::string key() const { return object + \":\" + pin; }\n    bool operator==(const Endpoint &b) const { return object == b.object && pin == b.pin; }\n};"
+  },
+  "change": {
+    "file": "src/DigitalEditor.cpp",
+    "line": 704,
+    "end": 720,
+    "code": "void LogicEditor::change(const std::function<void()> &action) {\n    // A failed edit must restore both the full model and the currently open definition.\n    canvas->cancel();\n    auto before = history.project;\n    auto oldCurrent = current;\n    try {\n        action();\n        history.project.validate();\n        history.commit(before);\n        rebuild(true, true);\n    } catch (...) {\n        history.project = std::move(before);\n        current = oldCurrent;\n        rebuild(true, true);\n        throw;\n    }\n}"
+  },
+  "zoom": {
+    "file": "src/LogicSupport.cpp",
+    "line": 24,
+    "end": 29,
+    "code": "void View::zoomAt(Point p, double z) {\n    // Keep the world point under the cursor fixed while changing scale.\n    auto w = world(p);\n    zoom = std::clamp(z, 0.1, 80.0);\n    offset = p - w * zoom;\n}"
+  },
+  "union": {
+    "file": "src/Digital.cpp",
+    "line": 708,
+    "end": 714,
+    "code": "int find(int i) { return parent[i] == i ? i : parent[i] = find(parent[i]); }\nvoid unite(int a, int b) {\n    a = find(a);\n    b = find(b);\n    if (a != b)\n        parent[b] = a;\n}"
+  },
+  "signal": {
+    "file": "include/Digital.h",
+    "line": 85,
+    "end": 97,
+    "code": "struct Signal {\n    // Per-bit masks distinguish known 0/1, high impedance (z), unknown and conflicting drivers (error).\n    int width = 1;\n    uint32_t value = 0, known = 0, z = 0, error = 0;\n    static Signal number(uint32_t value, int width);\n    static Signal unknown(int width);\n    static Signal floating(int width);\n    static Signal failure(int width);\n    bool defined() const;\n    std::string text() const;\n    bool operator==(const Signal &) const;\n    bool operator!=(const Signal &s) const { return !(*this == s); }\n};"
+  },
+  "batch": {
+    "file": "src/Digital.cpp",
+    "line": 1063,
+    "end": 1095,
+    "code": "bool step() {\n    // Evaluate the entire time batch against old net values, then publish all changed nets.\n    // Updating nets inside the first loop would make clock sampling depend on component order.\n    if (queue.empty() || oscillating)\n        return false;\n    auto it = queue.begin();\n    now = it->first;\n    auto batch = it->second;\n    queue.erase(it);\n    std::set<int> affected;\n    for (auto i : batch) {\n        auto &n = nodes[i];\n        auto before = n.outputs;\n        evaluate(n);\n        for (auto &out : n.outputs)\n            if (before[out.first] != out.second) {\n                affected.insert(n.nets[out.first]);\n                traces.push_back({now, n.path, out.first, out.second.text()});\n            }\n    }\n    if (traces.size() > 2000)\n        traces.erase(traces.begin(), traces.begin() + ptrdiff_t(traces.size() - 2000));\n    for (auto i : affected) {\n        auto &net = nets[i];\n        auto s = resolve(net);\n        if (s != net.signal) {\n            net.signal = s;\n            for (auto user : net.users)\n                queue[now + 1].insert(user);\n        }\n    }\n    return true;\n}"
+  },
+  "remap": {
+    "file": "src/CustomComponents.cpp",
+    "line": 96,
+    "end": 101,
+    "code": "auto remapEndpoint = [&](Endpoint &e) {\n    const auto *part = source.circuit(c.name).part(e.object);\n    if (part && part->kind == \"Subcircuit\")\n        e.pin = ids.at(e.pin);\n    e.object = ids.at(e.object);\n};"
+  },
+  "note": {
+    "file": "src/LogisimImport.cpp",
+    "line": 289,
+    "end": 296,
+    "code": "void note(Project &p, Circuit &c, Point at, const std::string &message) {\n    Part q;\n    q.id = p.id(\"p\");\n    q.kind = \"Text\";\n    q.at = at;\n    q.label = notePrefix + message;\n    c.parts.push_back(std::move(q));\n}"
+  },
+  "import-validation": {
+    "file": "src/LogisimImport.cpp",
+    "line": 511,
+    "end": 511,
+    "code": "return deserialize(serialize(p));"
+  },
+  "model-short": {
+    "file": "include/Digital.h",
+    "line": 15,
+    "end": 19,
+    "code": "std::string id, kind = \"And\", label, circuit;\nPoint at;\nint width = 1;\nuint32_t value = 0;\nstd::vector<uint32_t> data;"
+  },
+  "endpoint-short": {
+    "file": "include/LogicSupport.h",
+    "line": 32,
+    "end": 34,
+    "code": "std::string object, pin;\nstd::string key() const { return object + \":\" + pin; }\nbool operator==(const Endpoint &b) const { return object == b.object && pin == b.pin; }"
+  },
+  "signal-short": {
+    "file": "include/Digital.h",
+    "line": 87,
+    "end": 88,
+    "code": "int width = 1;\nuint32_t value = 0, known = 0, z = 0, error = 0;"
+  },
+  "batch-a": {
+    "file": "src/Digital.cpp",
+    "line": 1073,
+    "end": 1082,
+    "code": "for (auto i : batch) {\n    auto &n = nodes[i];\n    auto before = n.outputs;\n    evaluate(n);\n    for (auto &out : n.outputs)\n        if (before[out.first] != out.second) {\n            affected.insert(n.nets[out.first]);\n            traces.push_back({now, n.path, out.first, out.second.text()});\n        }\n}"
+  },
+  "batch-b": {
+    "file": "src/Digital.cpp",
+    "line": 1085,
+    "end": 1093,
+    "code": "for (auto i : affected) {\n    auto &net = nets[i];\n    auto s = resolve(net);\n    if (s != net.signal) {\n        net.signal = s;\n        for (auto user : net.users)\n            queue[now + 1].insert(user);\n    }\n}"
+  },
+  "change-try": {
+    "file": "src/DigitalEditor.cpp",
+    "line": 710,
+    "end": 713,
+    "code": "action();\nhistory.project.validate();\nhistory.commit(before);\nrebuild(true, true);"
+  },
+  "change-catch": {
+    "file": "src/DigitalEditor.cpp",
+    "line": 715,
+    "end": 718,
+    "code": "history.project = std::move(before);\ncurrent = oldCurrent;\nrebuild(true, true);\nthrow;"
+  }
+}
