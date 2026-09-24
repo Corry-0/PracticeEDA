@@ -247,6 +247,9 @@ std::vector<Point> wirePoints(const Project &p, const Circuit &c, const Wire &w)
     return orthogonal(v);
 }
 void erase(Circuit &c, const std::set<std::string> &ids) {
+    c.shapes.erase(
+        std::remove_if(c.shapes.begin(), c.shapes.end(), [&](const Shape &s) { return ids.count(s.id); }),
+        c.shapes.end());
     c.parts.erase(
         std::remove_if(c.parts.begin(), c.parts.end(), [&](const Part &p) { return ids.count(p.id); }),
         c.parts.end());
@@ -288,6 +291,22 @@ void Project::validate() const {
             throw std::runtime_error("电路名称重复或为空");
         if (c.parts.size() > 10000 || c.wires.size() > 40000 || c.nodes.size() > 40000)
             throw std::runtime_error("电路规模超出限制");
+        if (c.shapes.size() > 10000)
+            throw std::runtime_error("图形数量超出限制");
+        for (const auto &s : c.shapes) {
+            idCheck(s.id);
+            pos(s.a);
+            pos(s.b);
+            pos(s.control);
+            if (!shapeKind(s.kind) || !std::isfinite(s.stroke) || s.stroke < 1 || s.stroke > 20)
+                throw std::runtime_error("图形类型或线宽无效");
+            if (distance(s.a, s.b) < .01 ||
+                (s.kind != "Line" && s.kind != "Curve" &&
+                 (std::abs(s.a.x - s.b.x) < .01 || std::abs(s.a.y - s.b.y) < .01)))
+                throw std::runtime_error("图形尺寸不能为零");
+            if (s.kind == "Circle" && std::abs(std::abs(s.a.x - s.b.x) - std::abs(s.a.y - s.b.y)) > .01)
+                throw std::runtime_error("圆的宽高必须相等");
+        }
         std::set<std::string> labels;
         for (auto &p : c.parts) {
             idCheck(p.id);
@@ -348,6 +367,16 @@ std::string serialize(const Project &p) {
     for (auto &c : p.circuits) {
         json q = {
             {"name", c.name}, {"parts", json::array()}, {"nodes", json::array()}, {"wires", json::array()}};
+        q["shapes"] = json::array();
+        for (const auto &s : c.shapes)
+            q["shapes"].push_back({{"id", s.id},
+                                   {"kind", s.kind},
+                                   {"a", point(s.a)},
+                                   {"b", point(s.b)},
+                                   {"control", point(s.control)},
+                                   {"stroke", s.stroke},
+                                   {"filled", s.filled},
+                                   {"appearance", s.appearance}});
         for (auto &a : c.parts)
             q["parts"].push_back({{"id", a.id},
                                   {"kind", a.kind},
@@ -384,6 +413,22 @@ Project deserialize(const std::string &text) {
     for (auto &q : j.at("circuits")) {
         Circuit c;
         c.name = q.at("name");
+        if (q.contains("shapes")) {
+            if (!q.at("shapes").is_array())
+                throw std::runtime_error("图形列表格式错误");
+            for (const auto &a : q.at("shapes")) {
+                Shape s;
+                s.id = a.at("id");
+                s.kind = a.at("kind");
+                s.a = point(a.at("a"));
+                s.b = point(a.at("b"));
+                s.control = point(a.at("control"));
+                s.stroke = a.at("stroke");
+                s.filled = a.at("filled");
+                s.appearance = a.at("appearance");
+                c.shapes.push_back(s);
+            }
+        }
         for (auto &a : q.at("parts")) {
             Part x;
             x.id = a.at("id");
@@ -445,6 +490,9 @@ std::string copy(const Project &p, const Circuit &c, const std::set<std::string>
     Project clip = p;
     Circuit dest;
     dest.name = c.name;
+    for (const auto &s : c.shapes)
+        if (ids.count(s.id))
+            dest.shapes.push_back(s);
     for (auto &q : c.parts)
         if (ids.count(q.id))
             dest.parts.push_back(q);
@@ -476,7 +524,7 @@ std::set<std::string> paste(Project &p, Circuit &target, const std::string &text
     auto clip = deserialize(text);
     auto targetName = target.name;
     auto picked = clip.circuit(clip.main);
-    if (picked.parts.empty() && picked.nodes.empty())
+    if (picked.parts.empty() && picked.nodes.empty() && picked.shapes.empty())
         return {};
     std::map<std::string, std::string> definitions;
     std::vector<Circuit> imports;
@@ -496,6 +544,8 @@ std::set<std::string> paste(Project &p, Circuit &target, const std::string &text
         definitions[name] = newName;
         Circuit c = clip.circuit(name);
         c.name = newName;
+        for (auto &s : c.shapes)
+            s.id = p.id("s");
         std::map<std::string, std::string> ids;
         for (auto &q : c.parts) {
             auto oldId = q.id;
@@ -555,6 +605,14 @@ std::set<std::string> paste(Project &p, Circuit &target, const std::string &text
     auto &dest = p.circuit(targetName);
     std::map<std::string, std::string> ids;
     std::set<std::string> result;
+    for (auto s : picked.shapes) {
+        s.id = p.id("s");
+        s.a = s.a + offset;
+        s.b = s.b + offset;
+        s.control = s.control + offset;
+        dest.shapes.push_back(s);
+        result.insert(s.id);
+    }
     for (auto q : picked.parts) {
         auto old = q.id;
         q.id = p.id("p");

@@ -3,7 +3,6 @@
 #include <cmath>
 
 namespace eda::logic {
-namespace {
 wxColour signalColour(const Signal &s) {
     if (s.error)
         return wxColour("#dc2626");
@@ -12,6 +11,16 @@ wxColour signalColour(const Signal &s) {
     if (!s.defined())
         return wxColour("#d28b13");
     return wxColour(s.value ? "#139c59" : "#31577e");
+}
+namespace {
+wxColour signalFill(const Signal &s) {
+    if (s.error)
+        return wxColour("#fee2e2");
+    if (s.z)
+        return wxColour("#e2e8f0");
+    if (!s.defined())
+        return wxColour("#fef3c7");
+    return wxColour(s.value ? "#bbf7d0" : "#dbeafe");
 }
 void path(wxGraphicsContext &g, std::initializer_list<Point> points, bool closed = false) {
     auto p = g.CreatePath();
@@ -61,6 +70,39 @@ std::string blockName(const Part &p) {
 }
 } // namespace
 
+void drawShape(wxGraphicsContext &g, const Shape &s, bool selected, bool preview, double zoom) {
+    g.PushState();
+    g.SetPen(wxPen(wxColour(selected || preview ? "#6366f1" : "#26384b"), s.stroke,
+                   preview ? wxPENSTYLE_SHORT_DASH : wxPENSTYLE_SOLID));
+    g.SetBrush(s.filled ? wxBrush(wxColour("#e2e8f0")) : *wxTRANSPARENT_BRUSH);
+    auto bounds = shapeBounds(s);
+    auto lo = bounds.first, hi = bounds.second;
+    if (s.kind == "Line")
+        g.StrokeLine(s.a.x, s.a.y, s.b.x, s.b.y);
+    else if (s.kind == "Curve") {
+        auto path = g.CreatePath();
+        path.MoveToPoint(s.a.x, s.a.y);
+        path.AddQuadCurveToPoint(s.control.x, s.control.y, s.b.x, s.b.y);
+        g.StrokePath(path);
+    } else if (s.kind == "Rectangle")
+        g.DrawRectangle(lo.x, lo.y, hi.x - lo.x, hi.y - lo.y);
+    else
+        g.DrawEllipse(lo.x, lo.y, hi.x - lo.x, hi.y - lo.y);
+    if (selected) {
+        g.SetPen(wxPen(wxColour("#6366f1"), 1 / zoom, wxPENSTYLE_SHORT_DASH));
+        if (s.kind == "Curve") {
+            g.StrokeLine(s.a.x, s.a.y, s.control.x, s.control.y);
+            g.StrokeLine(s.control.x, s.control.y, s.b.x, s.b.y);
+        }
+        g.SetBrush(*wxWHITE_BRUSH);
+        for (auto p : std::vector<Point>{s.a, s.b})
+            g.DrawRectangle(p.x - 4 / zoom, p.y - 4 / zoom, 8 / zoom, 8 / zoom);
+        if (s.kind == "Curve")
+            g.DrawEllipse(s.control.x - 4 / zoom, s.control.y - 4 / zoom, 8 / zoom, 8 / zoom);
+    }
+    g.PopState();
+}
+
 void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
                 const std::function<Signal(const Port &)> &read, bool selected, bool error, bool preview) {
     const auto &k = part.kind;
@@ -76,6 +118,13 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
     g.PushState();
     g.Translate(part.at.x, part.at.y);
     outline();
+    bool custom = k == "Subcircuit" && std::any_of(project.circuit(part.circuit).shapes.begin(),
+                                                   project.circuit(part.circuit).shapes.end(),
+                                                   [](const Shape &s) { return s.appearance; });
+    if (custom)
+        for (const auto &s : project.circuit(part.circuit).shapes)
+            if (s.appearance)
+                drawShape(g, s, false, preview);
     if (k == "Text") {
         label(g, part.label.empty() && preview ? "文字标签" : part.label, -55, -10, 12, ink, -1);
         if (selected) {
@@ -92,6 +141,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
     bool fan = k == "Splitter" || k == "Joiner";
     bool compact = k == "Input" || k == "Output" || k == "Constant" || k == "Clock" || k == "Button" ||
                    k == "LED" || k == "Probe";
+    bool io = k == "Input" || k == "Output";
     bool supply = k == "Power" || k == "Ground";
     bool block = !triangle && !andGate && !orGate && !fan && !compact && !supply && k != "Hex";
     bool trapezoid = k == "Mux" || k == "Demux" || k == "Extender";
@@ -113,7 +163,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
                 end = -38 + 28 * t * (1 - t);
             }
         } else if (compact)
-            end = pin.output ? 24 : -24;
+            end = (pin.output ? 1 : -1) * (io ? 14 : 24);
         else if (k == "Hex")
             end = -52;
         else if (supply || fan)
@@ -181,7 +231,21 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
             g.StrokeLine(-4, 24, 4, 24);
         }
     } else if (compact) {
-        if (k == "LED") {
+        if (io) {
+            // Only the body shrinks: saved terminal anchors and existing wires stay identical.
+            g.SetPen(
+                wxPen(preview ? ink : liveColour, 2, preview ? wxPENSTYLE_SHORT_DASH : wxPENSTYLE_SOLID));
+            g.SetBrush(wxBrush(preview ? wxColour("#f1f5f9") : signalFill(value)));
+            if (k == "Input")
+                g.DrawRectangle(-14, -14, 28, 28);
+            else
+                g.DrawEllipse(-14, -14, 28, 28);
+            if (selected || error) {
+                g.SetPen(wxPen(ink, 1.5, wxPENSTYLE_SHORT_DASH));
+                g.SetBrush(*wxTRANSPARENT_BRUSH);
+                g.DrawRoundedRectangle(-18, -18, 36, 36, 4);
+            }
+        } else if (k == "LED") {
             g.SetBrush(wxBrush(value.defined() && value.value ? wxColour("#2bdd72") : wxColour("#e2e8f0")));
             g.DrawEllipse(-24, -24, 48, 48);
             path(g, {{4, -4}, {13, -13}});
@@ -196,6 +260,11 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
             g.SetBrush(wxBrush(value.defined() && value.value ? wxColour("#bbf7d0") : wxColour("#e2e8f0")));
             g.DrawRoundedRectangle(-16, -16, 32, 32, 4);
             label(g, preview ? "0" : value.text(), 0, -11, 12, liveColour, 0, 28);
+        } else if (io) {
+            if (part.width == 1 || preview)
+                label(g, preview ? (k == "Input" ? "0" : "?") : value.text(), 0, -9, 11, liveColour, 0, 24);
+            else
+                label(g, "BUS", 0, -7, 7, liveColour, 0, 24);
         } else if (k != "LED") {
             label(g, preview ? (k == "Probe" ? "?" : "0") : value.text(), 0, -12, 13, liveColour, 0, 42);
         }
@@ -223,7 +292,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
             path(g, {{-50, -h / 2}, {39, -h / 2 + 12}, {39, h / 2 - 12}, {-50, h / 2}}, true);
         else
             path(g, {{-39, -h / 2 + 12}, {50, -h / 2}, {50, h / 2}, {-39, h / 2 - 12}}, true);
-    } else
+    } else if (!custom)
         g.DrawRectangle(-55, -h / 2, 110, h);
     outline();
     if (inverted)
@@ -270,12 +339,24 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
     }
     if (!part.label.empty())
         name = name.empty() ? part.label : part.label + " · " + name;
+    double labelTop = -h / 2 - 24, valueBottom = h / 2 + 16;
+    if (io) {
+        labelTop = -38;
+        valueBottom = 24;
+    }
+    if (custom)
+        for (const auto &s : project.circuit(part.circuit).shapes)
+            if (s.appearance) {
+                auto b = shapeBounds(s);
+                labelTop = std::min(labelTop, b.first.y - s.stroke / 2 - 24);
+                valueBottom = std::max(valueBottom, b.second.y + s.stroke / 2 + 16);
+            }
     if (!name.empty())
-        label(g, name, 0, -h / 2 - 24, 10, ink);
+        label(g, name, 0, labelTop, 10, ink);
     if (!preview && !pp.empty()) {
         bool insideValue = compact && k != "Clock" && k != "LED" && k != "Button" && part.width == 1;
         if (!insideValue)
-            label(g, value.text(), 0, h / 2 + 16, 9, liveColour, 0, 130);
+            label(g, value.text(), 0, valueBottom, 9, liveColour, 0, 130);
     }
     g.PopState();
 }

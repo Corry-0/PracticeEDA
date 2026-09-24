@@ -25,11 +25,22 @@ struct Port {
     int width;
     Point at;
 };
+// Decorative geometry is separate from electrical parts and never participates in simulation.
+struct Shape {
+    std::string id, kind = "Line";
+    Point a, b, control;
+    double stroke = 2;
+    bool filled = false, appearance = false;
+};
+bool shapeKind(const std::string &);
+std::pair<Point, Point> shapeBounds(const Shape &);
+bool shapeHit(const Shape &, Point, double tolerance);
 struct Circuit {
     std::string name = "main";
     std::vector<Part> parts;
     std::vector<Junction> nodes;
     std::vector<Wire> wires;
+    std::vector<Shape> shapes;
     Part *part(const std::string &id);
     const Part *part(const std::string &id) const;
 };
@@ -59,10 +70,10 @@ std::vector<Point> wirePoints(const Project &, const Circuit &, const Wire &);
 void erase(Circuit &, const std::set<std::string> &);
 std::string serialize(const Project &);
 Project deserialize(const std::string &);
-// Restricted Logisim 2.7 XML conversion; the resulting project uses the unchanged v1 model.
+// Restricted 外部电路 2.7 XML conversion; the resulting project uses the unchanged v1 model.
 // Unmapped objects and import notes are ordinary Text parts, retained by save/undo/copy.
-Project importLogisim(const std::string &);
-std::vector<Issue> logisimDiagnostics(const Circuit &);
+Project importCirc(const std::string &);
+std::vector<Issue> circDiagnostics(const Circuit &);
 Project halfAdder();
 // Clipboard includes whole definitions so instances survive cross-project paste.
 std::string copy(const Project &, const Circuit &, const std::set<std::string> &);

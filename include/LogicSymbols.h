@@ -3,6 +3,9 @@
 #include "WxSupport.h"
 
 namespace eda::logic {
+wxColour signalColour(const Signal &);
+void drawShape(wxGraphicsContext &, const Shape &, bool selected = false, bool preview = false,
+               double zoom = 1);
 // Canvas, placement preview and export share this renderer. External pin positions
 // come exclusively from ports(), so changing artwork never changes saved wiring.
 void drawSymbol(wxGraphicsContext &, const Project &, const Part &,

@@ -48,13 +48,13 @@
     "code": "auto remapEndpoint = [&](Endpoint &e) {\n    const auto *part = source.circuit(c.name).part(e.object);\n    if (part && part->kind == \"Subcircuit\")\n        e.pin = ids.at(e.pin);\n    e.object = ids.at(e.object);\n};"
   },
   "note": {
-    "file": "src/LogisimImport.cpp",
+    "file": "src/CircImport.cpp",
     "line": 289,
     "end": 296,
     "code": "void note(Project &p, Circuit &c, Point at, const std::string &message) {\n    Part q;\n    q.id = p.id(\"p\");\n    q.kind = \"Text\";\n    q.at = at;\n    q.label = notePrefix + message;\n    c.parts.push_back(std::move(q));\n}"
   },
   "import-validation": {
-    "file": "src/LogisimImport.cpp",
+    "file": "src/CircImport.cpp",
     "line": 511,
     "end": 511,
     "code": "return deserialize(serialize(p));"

@@ -1,4 +1,4 @@
-// Logisim 2.7 conversion boundary. Source geometry is used only here; the saved model
+// 外部电路 2.7 conversion boundary. Source geometry is used only here; the saved model
 // still connects explicit endpoints. TinyXML2 is vendored to keep core tests GUI-free.
 #include "Digital.h"
 #include "tinyxml2.h"
@@ -9,7 +9,7 @@ namespace eda::logic {
 namespace {
 using XY = std::pair<int, int>;
 using Attrs = std::map<std::string, std::string>;
-constexpr const char *notePrefix = "Logisim 导入：";
+constexpr const char *notePrefix = "外部电路 导入：";
 std::string attr(const tinyxml2::XMLElement *e, const char *key, const char *fallback = "") {
     auto s = e->Attribute(key);
     return s ? s : fallback;
@@ -45,7 +45,7 @@ XY location(const std::string &s) {
     long long x, y;
     if (!(in >> a >> x >> b >> y >> c) || a != '(' || b != ',' || c != ')' || (in >> std::ws, !in.eof()) ||
         x < -200000 || x > 200000 || y < -200000 || y > 200000)
-        throw std::runtime_error("无效或过大的 Logisim 坐标：" + s);
+        throw std::runtime_error("无效或过大的 外部电路 坐标：" + s);
     return {int(x), int(y)};
 }
 Point position(XY p) {
@@ -147,7 +147,7 @@ void mapPart(Source &s) {
             {"NOR Gate", "Nor"}, {"XOR Gate", "Xor"}, {"XNOR Gate", "Xnor"}};
         if (gates.count(n)) {
             p.kind = gates.at(n);
-            require(number(get(a, "inputs", "5")) == 2, "仅支持双输入逻辑门（Logisim 缺省为 5 输入）");
+            require(number(get(a, "inputs", "5")) == 2, "仅支持双输入逻辑门（外部电路 缺省为 5 输入）");
             int size = int(number(get(a, "size", "50")));
             require(size == 30 || size == 50 || size == 70, "不支持的门尺寸");
             int length = size + ((p.kind == "Xor" || p.kind == "Xnor") ? 10 : 0) +
@@ -296,7 +296,7 @@ void note(Project &p, Circuit &c, Point at, const std::string &message) {
 }
 } // namespace
 
-std::vector<Issue> logisimDiagnostics(const Circuit &c) {
+std::vector<Issue> circDiagnostics(const Circuit &c) {
     std::vector<Issue> result;
     for (const auto &p : c.parts)
         if (p.kind == "Text" && p.label.rfind(notePrefix, 0) == 0)
@@ -304,20 +304,20 @@ std::vector<Issue> logisimDiagnostics(const Circuit &c) {
     return result;
 }
 
-Project importLogisim(const std::string &bytes) {
+Project importCirc(const std::string &bytes) {
     require(bytes.size() <= 32 * 1024 * 1024, "工程文件超过 32 MB");
     require(bytes.find('\0') == std::string::npos && bytes.find("<!DOCTYPE") == std::string::npos &&
                 bytes.find("<!ENTITY") == std::string::npos,
             "不支持 XML DTD、实体声明或 NUL");
     tinyxml2::XMLDocument doc;
     require(doc.Parse(bytes.data(), bytes.size()) == tinyxml2::XML_SUCCESS,
-            "Logisim XML 解析失败：" + std::string(doc.ErrorStr() ? doc.ErrorStr() : ""));
+            "外部电路 XML 解析失败：" + std::string(doc.ErrorStr() ? doc.ErrorStr() : ""));
     auto root = doc.RootElement();
     require(root && std::string(root->Name()) == "project" && !root->NextSiblingElement(),
-            "不是 Logisim 工程");
+            "不是 外部电路 工程");
     auto version = attr(root, "source");
     require((version == "2.7" || version.rfind("2.7.", 0) == 0) && attr(root, "version") == "1.0",
-            "受限导入仅支持 Logisim 2.7 的 version=1.0 工程");
+            "受限导入仅支持 外部电路 2.7 的 version=1.0 工程");
     std::map<std::string, std::string> libs;
     for (auto e = root->FirstChildElement("lib"); e; e = e->NextSiblingElement("lib"))
         require(!attr(e, "name").empty() && libs.emplace(attr(e, "name"), attr(e, "desc")).second,
@@ -327,7 +327,7 @@ Project importLogisim(const std::string &bytes) {
     auto main = root->FirstChildElement("main");
     require(main && !main->NextSiblingElement("main"), "必须指定唯一 main 电路");
     p.main = attr(main, "name");
-    p.name = p.main + "（Logisim 导入）";
+    p.name = p.main + "（外部电路 导入）";
     for (auto e = root->FirstChildElement("circuit"); e; e = e->NextSiblingElement("circuit")) {
         require(p.circuits.size() < 128, "电路数量超过 128");
         Circuit c;
@@ -445,7 +445,7 @@ Project importLogisim(const std::string &bytes) {
                 }
             }
             s.part.at = position(s.at);
-            // Place the model's anchor port at the original Logisim anchor.
+            // Place the model's anchor port at the original 外部电路 anchor.
             for (auto &pin : s.pins)
                 if (pin.first == s.at) {
                     for (auto &port : ports(p, s.part))

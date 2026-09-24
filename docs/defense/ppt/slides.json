@@ -81,7 +81,7 @@
     "purpose": "用证据组织五个能力阶段",
     "talk": [
       "我们把现有证据归纳为五个能力阶段。早期 Git 记录包含绘图类和 A 星路径构造，说明项目最初关注图形与连线。当前实现进一步把视觉路径和真正的电气端点分开。",
-      "第二阶段是统一工程模型、原生保存、校验和撤销；第三阶段扩展到总线、时序、层级和事件批次；第四阶段是自定义组件和网表，已有九月二十一日的验证文档；本轮新增的是 Logisim 二点七受限导入。",
+      "第二阶段是统一工程模型、原生保存、校验和撤销；第三阶段扩展到总线、时序、层级和事件批次；第四阶段是自定义组件和网表，已有九月二十一日的验证文档；本轮新增的是 外部电路 二点七受限导入。",
       "这里必须说明证据边界：旧提交和日期报告能确定部分时间点，但现代源码没有完整对应的逐阶段提交记录。因此中间阶段按能力依赖讲述，不虚构开发周数或历史作者。后面每个模块都会讲新增能力引出了什么问题，以及当前如何处理。"
     ],
     "transition": "首先看后续能力共同依赖的数据模型。",
@@ -375,19 +375,19 @@
   },
   {
     "id": "d-import-choice",
-    "title": "Logisim：选择有边界的兼容",
+    "title": "外部电路：选择有边界的兼容",
     "owner": "D",
     "minutes": 0.8,
     "layout": "S05",
     "theme": "dark",
     "purpose": "对比完整兼容、全拒绝、受限导入",
     "talk": [
-      "对 circ 文件有三种策略：完整复现 Logisim、遇到未知组件就拒绝，或者支持一个清楚的子集。完整兼容成本很高，因为元件端口、方向、使能和存储语义都有差异；全部拒绝又浪费文件中本来可以转换的部分。",
+      "对 circ 文件有三种策略：完整复现 外部电路、遇到未知组件就拒绝，或者支持一个清楚的子集。完整兼容成本很高，因为元件端口、方向、使能和存储语义都有差异；全部拒绝又浪费文件中本来可以转换的部分。",
       "当前采用受限映射，先支持常用 Wiring、Gates、Plexers 和 Memory 的部分配置。不能映射的组件会保留位置和文字说明，并进入诊断面板，其他可转换部分仍能继续编辑。",
       "这不是静默丢弃，也不是完整还原。比如五输入 AND 不能直接当成双输入 AND，双向 Splitter 也不能机械替换成单向器件。"
     ],
     "transition": "怎样让这些提示保存以后仍然存在？",
-    "source": "src/LogisimImport.cpp::mapPart；docs/LOGISIM_IMPORT_CN.md",
+    "source": "src/CircImport.cpp::mapPart；docs/CIRC_IMPORT_CN.md",
     "cue": "指向本页关键机制；不要逐字念代码。",
     "render": 17
   },
@@ -406,7 +406,7 @@
       "Text 只是可编辑的说明，不保留原器件行为，也不能无损导回 circ。坏 XML 等结构错误仍拒绝整个文件；局部不支持则保留诊断。"
     ],
     "transition": "这些约束是否有效，最后需要测试证据。",
-    "source": "src/LogisimImport.cpp::note/importLogisim；examples/logisim-limited.circ",
+    "source": "src/CircImport.cpp::note/importCirc；examples/circ-limited.circ",
     "cue": "指向 Text 字段和最后一行校验；需要现场演示时使用预留两分钟。",
     "render": 18
   },
@@ -419,12 +419,12 @@
     "theme": "dark",
     "purpose": "给出可复核的检查数及不同口径",
     "talk": [
-      "当前 Debug 下三组 C++ 程序分别报告一百七十三项、一百三十五项和一千零六十七项运行时检查，总计一千三百七十五。它们覆盖核心逻辑、组件网表与 Logisim 导入。",
+      "当前 Debug 下三组 C++ 程序分别报告一百七十三项、一百三十五项和一千零六十七项运行时检查，总计一千三百七十五。它们覆盖核心逻辑、组件网表与 外部电路 导入。",
       "另有四十九组网表文件，由独立 Python 解析器读取实际 S 表达式，再逐位对照 JSON；这和前三组是不同统计口径。当前环境的四个 CTest 目标通过，GUI 冒烟还检查实际操作、诊断持久化和源文件保护。",
       "我们不把这些数字叫覆盖率，也不据此声称已经兼容所有外部工具。截图能证明指定电路被渲染，断言能证明编码过的行为边界，二者互相补充。"
     ],
     "transition": "在进入提问之前，先回顾已经完成的成果和下一步验收目标。",
-    "source": "tests/digital_tests.cpp；component_netlist_tests.cpp；logisim_import_tests.cpp；verify_netlists.py",
+    "source": "tests/digital_tests.cpp；component_netlist_tests.cpp；circ_import_tests.cpp；verify_netlists.py",
     "cue": "指向本页关键机制；不要逐字念代码。",
     "render": 19
   },

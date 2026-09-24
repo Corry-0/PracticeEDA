@@ -62,12 +62,12 @@ void gateTests() {
                     int y = f == "north" ? length : f == "south" ? -length : offset;
                     return comp("Pin", 200 + x, 200 + y, a("label", label));
                 };
-                auto p = importLogisim(
+                auto p = importCirc(
                     project(input("A", size == 30 ? -10 : -20) + input("B", size == 30 ? 10 : 20) +
                             comp(n, 200, 200,
                                  a("inputs", "2") + a("facing", f) + a("size", std::to_string(size)), 1) +
                             comp("Pin", 200, 200, a("output", "true") + a("label", "Y"))));
-                check(logisimDiagnostics(p.circuit("main")).size() == 1, "only general import note");
+                check(circDiagnostics(p.circuit("main")).size() == 1, "only general import note");
                 Simulator s(p, "main");
                 for (int x = 0; x < 2; ++x)
                     for (int y = 0; y < 2; ++y) {
@@ -85,7 +85,7 @@ void gateTests() {
             }
 }
 void connectivityTests() {
-    auto p = importLogisim(project(comp("Constant", 0, 50, a("value", "1")) +
+    auto p = importCirc(project(comp("Constant", 0, 50, a("value", "1")) +
                                    comp("Pin", 100, 50, a("label", "horizontal") + a("output", "true")) +
                                    comp("Constant", 50, 0, a("value", "0")) +
                                    comp("Pin", 50, 100, a("label", "vertical") + a("output", "true")) +
@@ -94,7 +94,7 @@ void connectivityTests() {
     cross.settle();
     check(read(cross, part(p, "horizontal")) == 1 && read(cross, part(p, "vertical")) == 0,
           "bare crossing does not connect");
-    p = importLogisim(project(comp("Constant", 0, 0, a("width", "8") + a("value", "0xa5")) +
+    p = importCirc(project(comp("Constant", 0, 0, a("width", "8") + a("value", "0xa5")) +
                               wire(0, 0, 100, 0) + wire(100, 0, 0, 0) + wire(30, 0, 80, 0) +
                               wire(50, 0, 50, 50) + comp("Probe", 50, 50, a("label", "probe")) +
                               comp("Pin", 70, 0, a("width", "8") + a("output", "true") + a("label", "mid"))));
@@ -103,7 +103,7 @@ void connectivityTests() {
     check(part(p, "probe").width == 8 && read(tee, part(p, "probe")) == 0xa5,
           "T-junction, overlapping wires and probe bus inference");
     check(read(tee, part(p, "mid")) == 0xa5, "port in wire interior connects");
-    p = importLogisim(project(comp("Constant", 0, 0, a("value", "1")) +
+    p = importCirc(project(comp("Constant", 0, 0, a("value", "1")) +
                               comp("Tunnel", 0, 0, a("label", "bus")) +
                               comp("Tunnel", 100, 0, a("label", "bus")) +
                               comp("Pin", 100, 0, a("output", "true") + a("label", "out"))));
@@ -116,7 +116,7 @@ void wiringAndPlexerTests() {
         std::string name;
         Point muxA, muxB, muxS, demuxA, demuxB, demuxS, decoder0, decoderStep;
     };
-    // Offsets from Logisim 2.7's port definitions, not PracticeEDA symbol geometry.
+    // Offsets from 外部电路 2.7's port definitions, not PracticeEDA symbol geometry.
     for (const auto &d : std::vector<Direction>{
              {"east", {-30, -10}, {-30, 10}, {-20, 20}, {30, -10}, {30, 10}, {20, 20}, {20, -40}, {0, 10}},
              {"west", {30, -10}, {30, 10}, {20, 20}, {-30, -10}, {-30, 10}, {-20, 20}, {-20, -40}, {0, 10}},
@@ -142,7 +142,7 @@ void wiringAndPlexerTests() {
                 else
                     select.x *= -1;
             }
-            auto p = importLogisim(
+            auto p = importCirc(
                 project(comp("Multiplexer", 200, 200,
                              a("facing", d.name) + a("selloc", selloc) + a("width", "8"), 2) +
                         at("Constant", d.muxA, a("width", "8") + a("value", "0x5a")) +
@@ -162,7 +162,7 @@ void wiringAndPlexerTests() {
                 else
                     select.x *= -1;
             }
-            p = importLogisim(
+            p = importCirc(
                 project(comp("Demultiplexer", 200, 200, a("facing", d.name) + a("selloc", selloc), 2) +
                         at("Constant", {}, a("value", "1")) + at("Pin", select, a("label", "S")) +
                         at("Pin", d.demuxA, a("output", "true") + a("label", "Y0")) +
@@ -182,7 +182,7 @@ void wiringAndPlexerTests() {
             for (int i = 0; i < 4; ++i)
                 body += at("Pin", first + d.decoderStep * i,
                            a("output", "true") + a("label", "Y" + std::to_string(i)));
-            p = importLogisim(project(body));
+            p = importCirc(project(body));
             Simulator decoder(p, "main");
             for (int sel = 0; sel < 4; ++sel) {
                 decoder.setInput(part(p, "S").id, sel);
@@ -198,13 +198,13 @@ void wiringAndPlexerTests() {
                     comp("Constant", std::string(kind) == "NOT Gate" ? 70 : 80, 100, a("value", "1"));
         if (std::string(kind) == "Controlled Buffer")
             body += comp("Constant", 90, 110);
-        auto p = importLogisim(project(body));
+        auto p = importCirc(project(body));
         Simulator s(p, "main");
         s.settle();
         check(read(s, part(p, "gate"), "Y") == uint32_t(std::string(kind) != "NOT Gate"),
               "unary/controlled gate");
     }
-    auto p = importLogisim(
+    auto p = importCirc(
         project(comp("Bit Extender", 100, 0,
                      a("in_width", "1") + a("out_width", "8") + a("type", "zero") + a("label", "ext")) +
                 comp("Power", 60, 0) + comp("Ground", 0, 100, a("label", "gnd"))));
@@ -215,7 +215,7 @@ void wiringAndPlexerTests() {
     auto remapped = project(comp("Constant", 0, 0, a("label", "C")));
     remapped.replace(remapped.find("name='0'"), 8, "name='42'");
     remapped.replace(remapped.find("lib='0'"), 7, "lib='42'");
-    check(part(importLogisim(remapped), "C").kind == "Constant", "library IDs resolved through desc");
+    check(part(importCirc(remapped), "C").kind == "Constant", "library IDs resolved through desc");
 }
 void memoryTests() {
     for (auto kind : {"Register", "D Flip-Flop", "T Flip-Flop", "J-K Flip-Flop", "S-R Flip-Flop"}) {
@@ -228,8 +228,8 @@ void memoryTests() {
                     comp("Pin", 200, 200, a("label", "Q") + a("output", "true"));
         if (two)
             body += comp("Constant", 160, 220, a("value", "0"));
-        auto p = importLogisim(project(body));
-        check(logisimDiagnostics(p.circuit("main")).size() == 1, "memory mapped: " + n);
+        auto p = importCirc(project(body));
+        check(circDiagnostics(p.circuit("main")).size() == 1, "memory mapped: " + n);
         Simulator s(p, "main");
         s.settle();
         s.setInput(part(p, "D").id, 1);
@@ -239,7 +239,7 @@ void memoryTests() {
         s.settle();
         check(read(s, part(p, "Q")) == 1, "rising edge stores input: " + n);
     }
-    auto p = importLogisim(project(
+    auto p = importCirc(project(
         comp("ROM", 200, 0, a("label", "rom") + "<a name='contents'>addr/data: 8 8\n3*0 a5 ff</a>", 4) +
         comp("Constant", 60, 0, a("width", "8") + a("value", "3")) +
         comp("Pin", 200, 0, a("width", "8") + a("label", "out") + a("output", "true"))));
@@ -247,7 +247,7 @@ void memoryTests() {
     rom.settle();
     check(read(rom, part(p, "out")) == 0xa5 && part(p, "rom").data.size() == 5,
           "ROM header and run-length contents");
-    p = importLogisim(project(comp("RAM", 200, 0, a("label", "ram") + a("bus", "separate"), 4) +
+    p = importCirc(project(comp("RAM", 200, 0, a("label", "ram") + a("bus", "separate"), 4) +
                               comp("Constant", 60, 0, a("width", "8") + a("value", "3")) +
                               comp("Constant", 60, 20, a("width", "8") + a("value", "0x5a")) +
                               comp("Constant", 90, 40, a("value", "1")) +
@@ -259,21 +259,21 @@ void memoryTests() {
     check(read(ram, part(p, "ram"), "Q") == 0x5a, "RAM writes separate port on rising edge");
 }
 void partialAndValidationTests() {
-    auto p = importLogisim(project(comp("Constant", 0, 0) + comp("Alien", 100, 0, a("label", "unknown"), 9) +
+    auto p = importCirc(project(comp("Constant", 0, 0) + comp("Alien", 100, 0, a("label", "unknown"), 9) +
                                    comp("Pin", 200, 0, a("width", "64")) + wire(0, 0, 100, 0)));
     p.validate();
-    check(p.circuit("main").wires.size() >= 2 && logisimDiagnostics(p.circuit("main")).size() == 3,
+    check(p.circuit("main").wires.size() >= 2 && circDiagnostics(p.circuit("main")).size() == 3,
           "partial import preserves known objects, wires and unsupported diagnostics");
     auto saved = serialize(p);
     check(serialize(deserialize(saved)) == saved, "native v1 round trip unchanged");
-    check(logisimDiagnostics(deserialize(saved).circuit("main")).size() == 3,
+    check(circDiagnostics(deserialize(saved).circuit("main")).size() == 3,
           "diagnostics survive native save/reload");
     History history;
     history.reset(p, false);
     check(history.dirty(), "import is unsaved");
     history.markSaved();
     auto before = history.project;
-    auto notes = logisimDiagnostics(history.project.circuit("main"));
+    auto notes = circDiagnostics(history.project.circuit("main"));
     erase(history.project.circuit("main"), {notes.front().object});
     history.commit(before);
     check(history.undo() && serialize(history.project) == saved && history.redo(),
@@ -289,33 +289,33 @@ void partialAndValidationTests() {
           comp("Multiplexer", 0, 0, "", 2) + wire(-10, 20, 10, 20),
           comp("Constant", 0, 0, a("value", "garbage")), comp("Constant", 0, 0, a("width", "-1")),
           comp("Constant", 0, 0, a("futureBehavior", "1")), comp("Constant", 0, 0, "", 99)}) {
-        auto q = importLogisim(project(body));
-        check(logisimDiagnostics(q.circuit("main")).size() == 2, "unsupported variant diagnosed");
+        auto q = importCirc(project(body));
+        check(circDiagnostics(q.circuit("main")).size() == 2, "unsupported variant diagnosed");
     }
-    auto labels = importLogisim(project(comp("Pin", 0, 0, a("label", "重复&amp;标签")) +
+    auto labels = importCirc(project(comp("Pin", 0, 0, a("label", "重复&amp;标签")) +
                                             comp("Pin", 100, 0, a("label", "重复&amp;标签")),
                                         "<circuit name='child'><comp loc='(0,0)' name='main'/></circuit>"));
     labels.validate();
-    check(labels.circuits.size() == 2 && logisimDiagnostics(labels.circuit("main")).size() == 2,
+    check(labels.circuits.size() == 2 && circDiagnostics(labels.circuit("main")).size() == 2,
           "unicode/XML entities, duplicate pin labels, multiple circuits");
-    check(logisimDiagnostics(labels.circuit("child")).size() == 2,
+    check(circDiagnostics(labels.circuit("child")).size() == 2,
           "subcircuit instance is explicit placeholder");
     for (auto bad :
          {std::string("<project>"), project("") + "<extra/>",
           project("<comp name='Pin' lib='0' loc='(nan,1)'/>"), project("", "<circuit name='main'/>"),
           std::string("<!DOCTYPE project [<!ENTITY x SYSTEM 'file:///no'>]>") + project(""),
           project("").replace(project("").find("2.7.1"), 5, "3.9.0")})
-        rejects([&] { importLogisim(bad); }, "reject invalid project transactionally");
-    rejects([] { importLogisim(std::string(32 * 1024 * 1024 + 1, 'x')); }, "size limit");
+        rejects([&] { importCirc(bad); }, "reject invalid project transactionally");
+    rejects([] { importCirc(std::string(32 * 1024 * 1024 + 1, 'x')); }, "size limit");
     auto missingMain = project("");
     missingMain.replace(missingMain.find("name='main'"), 11, "name='absent'");
-    rejects([&] { importLogisim(missingMain); }, "reuse main circuit validation");
+    rejects([&] { importCirc(missingMain); }, "reuse main circuit validation");
     auto native = serialize(halfAdder());
     check(serialize(deserialize(native)) == native, "existing native file format preserved");
 }
 void exampleTest() {
-    auto p = importLogisim(readFile(std::filesystem::path(LOGIC_EXAMPLES_DIR) / "logisim-limited.circ"));
-    check(logisimDiagnostics(p.circuit("main")).size() == 2,
+    auto p = importCirc(readFile(std::filesystem::path(LOGIC_EXAMPLES_DIR) / "circ-limited.circ"));
+    check(circDiagnostics(p.circuit("main")).size() == 2,
           "example has unsupported Adder and general note");
     Simulator s(p, "main");
     s.settle();
@@ -339,7 +339,7 @@ int main() {
         memoryTests();
         partialAndValidationTests();
         exampleTest();
-        std::cout << "Logisim import: " << checks << " checks passed\n";
+        std::cout << "外部电路 import: " << checks << " checks passed\n";
         return 0;
     } catch (const std::exception &e) {
         std::cerr << "FAIL after " << checks << " checks: " << e.what() << '\n';

@@ -105,6 +105,8 @@ std::string importComponent(Project &project, const std::string &bytes) {
             w.id = ids.at(w.id);
         }
         c.name = names.at(c.name);
+        for (auto &s : c.shapes)
+            s.id = candidate.id("s");
         for (auto &p : c.parts) {
             p.id = ids.at(p.id);
             if (p.kind == "Subcircuit")

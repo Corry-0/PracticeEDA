@@ -1,6 +1,6 @@
 # PracticeEDA — 数字电路设计与仿真
 
-C++17 / wxWidgets 桌面数字电路编辑器，按 Logisim 的七类元件库组织。启动即进入数字电路设计界面。
+C++17 / wxWidgets 桌面数字电路编辑器，提供七类数字元件库。启动即进入数字电路设计界面。
 
 个人发布仓库：[Corry-0/PracticeEDA](https://github.com/Corry-0/PracticeEDA)。
 
@@ -17,14 +17,20 @@ C++17 / wxWidgets 桌面数字电路编辑器，按 Logisim 的七类元件库�
 - `examples/half-adder.logic.json`：半加器。
 - `examples/bus-register.logic.json`：8 位总线、时钟和寄存器。
 - `examples/hierarchical-adder.logic.json`：子电路封装与调用。
-- `examples/logisim-limited.circ`：Logisim 2.7 受限导入示例，含逻辑门、复用器、寄存器和未支持元件。
+- `examples/circ-limited.circ`：外部电路 2.7 受限导入示例，含逻辑门、复用器、寄存器和未支持元件。
+- `examples/drawn-half-adder.component.json`：带自定义符号外观的可运行半加器。
 - `examples/half-adder.component.json`：可通过“项目 → 导入自定义元件”复用的半加器。
 
-工程使用 `.logic.json`，独立元件使用 `.component.json`；支持 Logisim 2.7 `.circ` 的[受限导入](docs/LOGISIM_IMPORT_CN.md)，无法映射的组件会保留为可编辑文字并列入诊断，保存格式不变。真值表最多 10 位输入，表达式输出为未最小化的标准与或式。
+工程使用 `.logic.json`，独立元件使用 `.component.json`；支持 外部电路 2.7 `.circ` 的[受限导入](docs/CIRC_IMPORT_CN.md)，无法映射的组件会保留为可编辑文字并列入诊断，保存格式不变。真值表最多 10 位输入，表达式输出为未最小化的标准与或式。
 
 ## 新增功能
 
-- **文件 → 打开 → Logisim 2.7 受限导入**：支持部分 Wiring、Gates、Plexers、Memory 和坐标连线，导入后另存为 `.logic.json`。具体支持范围见 [中文导入说明](docs/LOGISIM_IMPORT_CN.md)。
+- **画布与属性交互**：输入输出使用更小的符号和五种实时状态色；右侧提供可直接编辑的属性表格、连接错误/警告列表及双击定位；网格点更清晰。
+
+- **图形工具与元件外观**：直线、曲线、矩形、椭圆、圆，支持线宽、填充、控制点调整、复制及撤销。选择“工具 → 编辑元件外观”设计实例符号，选择“工具 → 返回电路编辑”继续内部逻辑。详见[操作说明](docs/CUSTOM_COMPONENTS_NETLIST_CN.md#图形与元件外观)。
+
+
+- **文件 → 打开 → 外部电路 2.7 受限导入**：支持部分 Wiring、Gates、Plexers、Memory 和坐标连线，导入后另存为 `.logic.json`。具体支持范围见 [中文导入说明](docs/CIRC_IMPORT_CN.md)。
 
 - **项目 → 新建自定义元件**：填写元件名称与输入/输出接口（如 `DATA:8`），然后在画布实现内部逻辑。切回 `main`，从“自定义元件 / 子电路”库放置实例；双击实例可编辑定义。
 - **项目 → 保存当前电路为元件 / 导入自定义元件**：保存独立 `.component.json`，自动携带嵌套依赖。导入不会覆盖已有定义，重名自动添加后缀，支持撤销重做。
@@ -59,7 +65,7 @@ ctest --test-dir build-core --output-on-failure
 | 位置 | 内容 |
 | --- | --- |
 | `include/Digital.h`、`src/Digital.cpp` | 数字电路、仿真、子电路、文件格式、历史与分析 |
-| `src/LogisimImport.cpp`、`tests/logisim_import_tests.cpp` | Logisim 2.7 XML 受限转换、原生校验复用及导入回归 |
+| `src/CircImport.cpp`、`tests/circ_import_tests.cpp` | 外部电路 2.7 XML 受限转换、原生校验复用及导入回归 |
 | `src/CustomComponents.cpp` | 自定义接口创建、依赖打包、导入重命名与 ID 重映射 |
 | `include/LogicSupport.h`、`src/LogicSupport.cpp` | 画布几何、导线基础类型、文件读写 |
 | `include/WxSupport.h` | wxWidgets 字符和路径转换 |
