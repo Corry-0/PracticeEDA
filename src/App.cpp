@@ -2,7 +2,7 @@
 #include <wx/cmdline.h>
 #include <wx/imagpng.h>
 
-// One application entry point; smoke-test failures become a nonzero process exit code for build.ps1.
+// 唯一的应用入口；冒烟测试失败会变成非零进程退出码，供 build.ps1 判断。
 class PracticeApp : public wxApp {
   public:
     int OnRun() override {

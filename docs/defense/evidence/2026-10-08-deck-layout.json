@@ -1,0 +1,195 @@
+{
+  "date": "2026-10-08",
+  "viewport": [
+    1280,
+    720
+  ],
+  "slideCount": 25,
+  "keyboard": true,
+  "presenter": {
+    "mounted": true,
+    "noteCount": 25,
+    "minutes": 18,
+    "frames": 2,
+    "nextWorked": true
+  },
+  "errors": [],
+  "remoteRequests": [],
+  "slides": [
+    {
+      "index": 0,
+      "id": "a-cover",
+      "title": "PracticeEDA：可编辑、可运行、可追踪",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 1,
+      "id": "team-roadmap",
+      "title": "四位成员，一条完整技术链",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 2,
+      "id": "a-scope",
+      "title": "把课程要求变成可演示的验收项",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 3,
+      "id": "a-choices",
+      "title": "延续现有架构，把投入用在功能语义",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 4,
+      "id": "a-evolution",
+      "title": "A01—A18：围绕四条能力链完善",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 5,
+      "id": "a-model",
+      "title": "定义保存结构，实例保存运行状态",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 6,
+      "id": "handoff-ab",
+      "title": "从结构约定，到可靠编辑",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 7,
+      "id": "b-contract",
+      "title": "保留熟悉三栏，让状态与入口更清楚",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 8,
+      "id": "b-artwork",
+      "title": "参数化元件，让一个符号承担一类能力",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 9,
+      "id": "b-endpoint",
+      "title": "显式连接与事务回滚，保证可恢复编辑",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 10,
+      "id": "b-history",
+      "title": "从可编辑真值表，到等价门电路",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 11,
+      "id": "b-properties",
+      "title": "正确性与最小性，分别给出证据",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 12,
+      "id": "handoff-bc",
+      "title": "从静态电路，到随时间变化的状态",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 13,
+      "id": "c-scheduling",
+      "title": "同一时刻先求值，再统一发布变化",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 14,
+      "id": "c-topology",
+      "title": "逐位信号与双向开关，保留电气含义",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 15,
+      "id": "c-signals",
+      "title": "时钟、寄存器和存储，拥有各自的规则",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 16,
+      "id": "c-batch",
+      "title": "重点：进入真实实例，状态始终连续",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 17,
+      "id": "c-memory",
+      "title": "观察、运行操作、修改定义，边界明确",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 18,
+      "id": "handoff-cd",
+      "title": "从运行结果，到可交换、可复核的证据",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 19,
+      "id": "d-components",
+      "title": ".circ交换：用双方软件验证通用能力",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 20,
+      "id": "d-import-choice",
+      "title": "PCB网表：从抽象端口走到实体引脚",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 21,
+      "id": "d-diagnostics",
+      "title": "日志、诊断与输出，服务完整演示流程",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 22,
+      "id": "d-evidence",
+      "title": "验证结论，都能找到对应结果文件",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 23,
+      "id": "d-recap",
+      "title": "现场演示：四个结果，串起核心能力",
+      "overflow": [],
+      "images": true
+    },
+    {
+      "index": 24,
+      "id": "team-closing",
+      "title": "把每一项能力，落到可解释的结果",
+      "overflow": [],
+      "images": true
+    }
+  ]
+}

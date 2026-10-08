@@ -1,7 +1,12 @@
-// Editor commands share transactional model changes; read-only exports never rebuild the simulator.
+// 编辑器命令共享事务式的模型修改；只读导出绝不重建仿真器。
 #include "DigitalEditor.h"
 #include "LogicIcons.h"
 #include "LogicSymbols.h"
+#include "LogicAnalysis.h"
+#include "CircExchange.h"
+#include "PcbExport.h"
+#include <fstream>
+#include <iomanip>
 #include <sstream>
 #include <wx/clipbrd.h>
 #include <wx/dataobj.h>
@@ -11,6 +16,12 @@
 #include <wx/stdpaths.h>
 #include <wx/textdlg.h>
 #include <wx/toolbar.h>
+#include <wx/splitter.h>
+#include <wx/dirdlg.h>
+#include <wx/choicdlg.h>
+#include <wx/print.h>
+#include <wx/printdlg.h>
+#include <wx/config.h>
 
 namespace eda::logic {
 namespace {
@@ -27,6 +38,7 @@ enum {
     L_TICK,
     L_RUN,
     L_RESET,
+    L_RUN_CYCLES,
     L_TABLE,
     L_EXPRESSION,
     L_TRACE,
@@ -45,9 +57,24 @@ enum {
     L_CURVE,
     L_RECTANGLE,
     L_ELLIPSE,
-    L_CIRCLE
+    L_CIRCLE,
+    L_GUIDE, L_UP, L_EDIT_DEFINITION, L_MEMORY_INITIAL, L_MEMORY_RUNTIME, L_PIN_LAYOUT,
+    L_MONITOR, L_RECENT, L_TEMPLATE, L_BATCH_PNG, L_PRINT, L_PREVIEW, L_EXPORT_CIRC,
+    L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE,
+    L_RECENT_FIRST = wxID_HIGHEST + 900
 };
-enum PropertyRow { P_TYPE, P_ID, P_LABEL, P_WIDTH, P_VALUE, P_MEMORY, P_STATE, P_STROKE, P_FILL, P_COUNT };
+enum PropertyRow { P_TYPE, P_ID, P_LABEL, P_WIDTH, P_VALUE, P_MEMORY, P_STATE, P_STROKE, P_FILL,
+    P_ROTATION, P_INPUTS, P_INVERT, P_SELECT, P_INPUTWIDTH, P_SIGN, P_HIGH, P_LOW, P_PHASE,
+    P_FALLING, P_MAX, P_LOAD, P_ADDR, P_MOMENTARY, P_ACTIVELOW, P_GROUPS,
+    P_OUTPUTWIDTH, P_MODE, P_ROWS, P_COLS, P_COUNT };
+const std::map<int, std::pair<std::string, int64_t>> parameterRows = {
+    {P_INPUTS,{"inputs",2}}, {P_INVERT,{"invertMask",0}}, {P_SELECT,{"selectBits",1}},
+    {P_INPUTWIDTH,{"inputWidth",1}}, {P_SIGN,{"signExtend",0}}, {P_HIGH,{"highTicks",1}},
+    {P_LOW,{"lowTicks",1}}, {P_PHASE,{"phase",0}}, {P_FALLING,{"falling",0}},
+    {P_MAX,{"counterMax",-1}}, {P_LOAD,{"loadable",0}}, {P_ADDR,{"addressBits",8}},
+    {P_MOMENTARY,{"momentary",0}}, {P_ACTIVELOW,{"activeLow",0}},
+    {P_OUTPUTWIDTH,{"outputWidth",1}}, {P_MODE,{"mode",0}}, {P_ROWS,{"rows",8}}, {P_COLS,{"cols",8}}
+};
 struct Item : wxTreeItemData {
     std::string kind, circuit;
     Item(std::string k, std::string c = "") : kind(std::move(k)), circuit(std::move(c)) {}
@@ -83,7 +110,7 @@ std::string pretty(const std::string &k) {
             return info.name;
     return k;
 }
-const wxString openFilter = U("可打开的工程 (*.logic.json;*.circ)|*.logic.json;*.circ|外部电路 2.7 受限导入 "
+const wxString openFilter = U("可打开的工程 (*.logic.json;*.circ)|*.logic.json;*.circ|Logisim 2.7 兼容导入 "
                               "(*.circ)|*.circ|JSON 文件 (*.json)|*.json");
 const wxString filter = U("数字逻辑工程 (*.logic.json)|*.logic.json|JSON 文件 (*.json)|*.json");
 } // namespace
@@ -107,6 +134,12 @@ LogicEditor::LogicEditor(wxWindow *parent)
                   {L_PNG, "导出完整电路 PNG…"},
                   {L_CSV, "导出最近分析 CSV…"},
                   {L_NETLIST, "导出网表…"},
+                  {L_EXPORT_CIRC, "导出 Logisim 2.7 .circ…"},
+                  {L_TEMPLATE, "从模板新建…"},
+                  {L_RECENT, "最近打开"},
+                  {L_BATCH_PNG, "批量导出子电路 PNG…"},
+                  {L_PREVIEW, "打印预览…"},
+                  {L_PRINT, "打印…"},
                   {wxID_EXIT, "关闭"}});
     menu("编辑", {{wxID_UNDO, "撤销\tCtrl+Z"},
                   {wxID_REDO, "重做\tCtrl+Y"},
@@ -126,6 +159,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
                   {L_ELLIPSE, "椭圆 (E)"},
                   {L_CIRCLE, "圆 (C)"},
                   {L_APPEARANCE, "切换电路 / 元件外观"},
+                  {L_ROTATE, "顺时针旋转元件\tCtrl+R"},
                   {L_FIT, "适合画面 (Home)"}});
     menu("项目", {{L_NEW_CIRCUIT, "新建子电路…"},
                   {L_NEW_COMPONENT, "新建自定义元件…"},
@@ -134,13 +168,23 @@ LogicEditor::LogicEditor(wxWindow *parent)
                   {L_WRAP, "封装当前电路为子电路…"},
                   {L_RENAME, "重命名当前电路…"},
                   {L_DEL_CIRCUIT, "删除当前子电路"}});
+    bar->GetMenu(3)->AppendSeparator();
+    bar->GetMenu(3)->Append(L_UP, U("返回上级实例\tAlt+Up"));
+    bar->GetMenu(3)->Append(L_EDIT_DEFINITION, U("编辑当前电路定义（暂停并复位）"));
+    bar->GetMenu(3)->Append(L_PIN_LAYOUT, U("自定义符号引脚布局…"));
     menu("仿真", {{L_STEP, "单步传播\tF7"},
-                  {L_TICK, "时钟半周期\tF8"},
+                  {L_TICK, "时钟基础节拍\tF8"},
                   {L_RUN, "运行 / 暂停\tF5"},
+                  {L_RUN_CYCLES, "运行指定节拍…"},
                   {L_RESET, "复位"},
                   {L_TRACE, "事件追踪"}});
-    menu("分析", {{L_TABLE, "当前电路真值表与表达式"}, {L_EXPRESSION, "表达式 → 真值表…"}});
-    menu("帮助", {{L_HELP, "数字逻辑使用说明"}});
+    bar->GetMenu(4)->Append(L_MEMORY_RUNTIME, U("查看实例运行内存…"));
+    bar->GetMenu(4)->Append(L_MEMORY_INITIAL, U("编辑存储器初始内容…"));
+    bar->GetMenu(4)->Append(L_MONITOR, U("信号监测 / 连续 CSV 日志…"));
+    bar->GetMenu(4)->Append(L_TEXT_DEVICE, U("键盘输入 / TTY 内容…"));
+    menu("分析", {{L_TABLE, "当前电路真值表与表达式"}, {L_EXPRESSION, "表达式 → 真值表…"},
+                  {L_NEW_TABLE,"新建可编辑真值表…"}, {L_IMPORT_TABLE,"导入真值表 CSV…"}});
+    menu("帮助", {{L_GUIDE, "操作指南"}, {L_HELP, "数字逻辑使用说明"}});
     SetMenuBar(bar);
     auto root = new wxBoxSizer(wxVERTICAL);
     auto toolbar = new wxToolBar(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
@@ -224,13 +268,20 @@ LogicEditor::LogicEditor(wxWindow *parent)
                                                               {wxID_REDO, "Redo"},
                                                               {L_HELP, "Help"}})
         bar->FindItem(item.first)->SetBitmap(icon(item.second));
-    auto body = new wxBoxSizer(wxHORIZONTAL);
-    auto left = new wxPanel(this);
+    auto body = new wxSplitterWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    auto centre = new wxSplitterWindow(body, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    body->SetMinimumPaneSize(190);
+    centre->SetMinimumPaneSize(270);
+    auto left = new wxPanel(body);
     left->SetMinSize({240, -1});
     auto ls = new wxBoxSizer(wxVERTICAL);
     ls->Add(new wxStaticText(left, wxID_ANY, U("项目 / 数字元件库")), 0, wxALL, 10);
     circuits = new wxChoice(left, wxID_ANY);
     ls->Add(circuits, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
+    ls->Add(new wxStaticText(left, wxID_ANY, U("运行实例层次（双击进入）")), 0, wxALL, 8);
+    hierarchy = new wxTreeCtrl(left, wxID_ANY, wxDefaultPosition, {240, 150}, wxTR_DEFAULT_STYLE);
+    hierarchy->SetName("simulation-hierarchy");
+    ls->Add(hierarchy, 0, wxEXPAND | wxLEFT | wxRIGHT, 6);
     search = new wxTextCtrl(left, wxID_ANY);
     search->SetHint(U("搜索元件名称或类型"));
     ls->Add(search, 0, wxEXPAND | wxALL, 8);
@@ -249,16 +300,9 @@ LogicEditor::LogicEditor(wxWindow *parent)
         addIcon(item.kind);
     tree->AssignImageList(images);
     ls->Add(tree, 1, wxEXPAND | wxALL, 6);
-    auto hints = new wxStaticText(
-        left, wxID_ANY,
-        U("单击库元件，再点画布放置\n也可从库直接拖入画布\nShift 多选 · 空白处框选\n滚轮缩放 · "
-          "中键平移\n双击输入切换 · 双击实例进入\n连线时点导线创建分支\n双击空白结束导线 · Esc 取消"));
-    ls->Add(hints, 0, wxALL, 10);
     left->SetSizer(ls);
-    body->Add(left, 0, wxEXPAND);
-    canvas = new LogicCanvas(this, this);
-    body->Add(canvas, 1, wxEXPAND);
-    auto right = new wxPanel(this);
+    canvas = new LogicCanvas(this, centre);
+    auto right = new wxPanel(centre);
     right->SetMinSize({320, -1});
     auto rs = new wxBoxSizer(wxVERTICAL);
     selection = new wxStaticText(right, wxID_ANY, U("未选中元件"));
@@ -281,7 +325,11 @@ LogicEditor::LogicEditor(wxWindow *parent)
     properties->SetMinSize({300, 220});
     const char *captions[] = {"类型",          "对象 ID",    "名称 / 网络标签", "数据位宽 (1–32)",
                               "输入 / 初始值", "存储器初值", "当前信号",        "图形线宽 (1–20)",
-                              "填充"};
+                              "填充", "朝向 (0–3)", "输入数量", "输入反相位掩码", "选择位数",
+                              "扩展输入位宽", "符号扩展 (0/1)", "时钟高电平节拍", "时钟低电平节拍",
+                              "时钟相位", "下降沿 (0/1)", "计数上限 (-1自动)", "装载引脚 (0/1)",
+                              "地址位数", "瞬时按钮 (0/1)", "低电平有效 (0/1)", "总线分组",
+                              "输出位宽", "查找模式 (0–3)", "矩阵行数", "矩阵列数"};
     for (int row = 0; row < P_COUNT; ++row) {
         properties->SetCellValue(row, 0, U(captions[row]));
         properties->SetReadOnly(row, 0);
@@ -319,7 +367,18 @@ LogicEditor::LogicEditor(wxWindow *parent)
     diagnosticDetail->SetName("connection-diagnostic-detail");
     rs->Add(diagnosticDetail, 0, wxEXPAND | wxALL, 8);
     right->SetSizer(rs);
-    body->Add(right, 0, wxEXPAND);
+    centre->SetSashGravity(1);
+    centre->SplitVertically(canvas, right, -340);
+    body->SplitVertically(left, centre, 265);
+    auto navigationBar = new wxBoxSizer(wxHORIZONTAL);
+    auto up = new wxButton(this, L_UP, U("↑ 返回上级"));
+    breadcrumbs = new wxChoice(this, wxID_ANY);
+    breadcrumbs->SetName("instance-breadcrumbs");
+    auto editDefinitionButton = new wxButton(this, L_EDIT_DEFINITION, U("编辑定义（复位）"));
+    navigationBar->Add(up, 0, wxRIGHT, 8);
+    navigationBar->Add(breadcrumbs, 1, wxEXPAND);
+    navigationBar->Add(editDefinitionButton, 0, wxLEFT, 8);
+    root->Add(navigationBar, 0, wxEXPAND | wxALL, 8);
     root->Add(body, 1, wxEXPAND);
     status = new wxStaticText(this, wxID_ANY, "");
     root->Add(status, 0, wxEXPAND | wxALL, 8);
@@ -484,7 +543,21 @@ LogicEditor::LogicEditor(wxWindow *parent)
     });
     bind(L_RESET, [this] {
         stop();
-        simulator = std::make_unique<Simulator>(history.project, current);
+        simulator->reset();
+        rebuild(false);
+    });
+    bind(L_RUN_CYCLES, [this] {
+        wxTextEntryDialog d(this, U("推进多少个基础节拍？（1–100000）\n各时钟根据自身高/低持续节拍与相位独立变化。"), U("运行指定节拍"), "10");
+        if (d.ShowModal() != wxID_OK)
+            return;
+        long n;
+        if (!d.GetValue().ToLong(&n) || n < 1 || n > 100000)
+            throw std::runtime_error("节拍数应为 1–100000");
+        stop();
+        if (simulator->pending())
+            simulator->settle();
+        for (long i = 0; i < n && !simulator->oscillating(); ++i)
+            simulator->tick();          // 全局基础节拍，不把多个独立时钟误称为同一周期。
         rebuild(false);
     });
     bind(L_TRACE, [this] {
@@ -497,6 +570,23 @@ LogicEditor::LogicEditor(wxWindow *parent)
     bind(L_TABLE, [this] {
         stop();
         showTable(truthTable(history.project, current));
+    });
+    bind(L_IMPORT_TABLE,[this] {
+        wxFileDialog file(this,U("导入真值表 CSV"),"","","CSV (*.csv)|*.csv",wxFD_OPEN|wxFD_FILE_MUST_EXIST);
+        if(file.ShowModal()==wxID_OK) { stop();showTable(parseTruthCsv(readFile(fsPath(file.GetPath())))); }
+    });
+    bind(L_NEW_TABLE,[this] {
+        wxTextEntryDialog inputs(this,U("输入变量名，以英文逗号分隔（1–10 个）"),U("新建真值表"),"A,B");
+        if(inputs.ShowModal()!=wxID_OK)return;
+        wxTextEntryDialog outputs(this,U("输出变量名，以英文逗号分隔"),U("新建真值表"),"Y");
+        if(outputs.ShowModal()!=wxID_OK)return;
+        Table table;auto names=[](const wxString &text){std::vector<std::string> values;std::istringstream input(utf8(text));std::string name;
+            while(std::getline(input,name,',')){auto value=U(name);value.Trim().Trim(false);values.push_back(utf8(value));}return values;};
+        table.inputs=names(inputs.GetValue());table.outputs=names(outputs.GetValue());
+        if(table.inputs.empty()||table.inputs.size()>10||table.outputs.empty())throw std::runtime_error("需要 1–10 个输入和至少一个输出");
+        for(size_t code=0;code<(size_t(1)<<table.inputs.size());++code){std::vector<int> row(table.inputs.size()+table.outputs.size(),0);
+            for(size_t bit=0;bit<table.inputs.size();++bit)row[bit]=int((code>>bit)&1);table.rows.push_back(std::move(row));}
+        stop();showTable(std::move(table));
     });
     bind(L_EXPRESSION, [this] {
         wxTextEntryDialog d(this, U("变量用英文字母/下划线；支持 ! ~ & * ^ | + 和括号"), U("表达式分析"),
@@ -516,8 +606,65 @@ LogicEditor::LogicEditor(wxWindow *parent)
         canvas->cancel();
         wxFileDialog d(this, U("导出完整电路"), "", "logic.png", "PNG (*.png)|*.png",
                        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-        if (d.ShowModal() == wxID_OK)
-            canvas->exportPng(d.GetPath());
+        if (d.ShowModal() == wxID_OK) {
+            wxTextEntryDialog scale(this, U("导出比例（0.25–4 倍）"), U("PNG 导出比例"), "1.5");
+            if (scale.ShowModal() != wxID_OK) return;
+            double value;
+            if (!scale.GetValue().ToDouble(&value) || value < .25 || value > 4)
+                throw std::runtime_error("比例应为 0.25–4");
+            canvas->exportPng(d.GetPath(), value);
+        }
+    });
+    bind(L_GUIDE, [this] {
+        showReport("操作指南",
+            "单击库元件，再点画布放置\n也可从库直接拖入画布\nShift 多选 · 空白处框选\n"
+            "滚轮缩放 · 中键平移\n双击输入切换 · 双击实例进入\n连线时点导线创建分支\n"
+            "双击空白结束导线 · Esc 取消\n\n"
+            "运行实例调试\n双击子电路查看该实例的真实信号，导航不暂停、不复位。\n"
+            "使用顶部路径或“返回上级”导航；接口 Input 由父层驱动。\n"
+            "实例内可操作按钮；改线或属性请点击“编辑定义（复位）”。\n"
+            "F5 运行/暂停；F7 单步传播；F8 时钟节拍。\n"
+            "Ctrl+R 顺时针旋转；右键显示当前对象的快捷操作。");
+    });
+    bind(L_UP, [this] { if (!navigation.empty()) navigateTo(navigation.size() - 1); });
+    bind(L_EDIT_DEFINITION, [this] { editDefinition(); });
+    for (int id : {L_UP, L_EDIT_DEFINITION})
+        Bind(wxEVT_BUTTON, [this,id](wxCommandEvent &) {
+            wxCommandEvent command(wxEVT_MENU,id); GetEventHandler()->ProcessEvent(command);
+        }, id);
+    bind(L_MEMORY_INITIAL, [this] { memoryEditor(false); });
+    bind(L_MEMORY_RUNTIME, [this] { memoryEditor(true); });
+    bind(L_PIN_LAYOUT, [this] { pinLayout(); });
+    bind(L_MONITOR, [this] { monitorSignals(); });
+    bind(L_BATCH_PNG, [this] { exportBatch(); });
+    bind(L_PREVIEW, [this] { printCircuit(true); });
+    bind(L_PRINT, [this] { printCircuit(false); });
+    bind(L_TEXT_DEVICE, [this] { textDevice(); });
+    bind(L_EXPORT_CIRC, [this] {
+        wxFileDialog dialog(this,U("导出 Logisim 2.7 电路"),"","project.circ","Logisim (*.circ)|*.circ",
+                            wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+        if(dialog.ShowModal()==wxID_OK) writeAtomic(fsPath(dialog.GetPath()),exportCirc(history.project));
+    });
+    bind(L_ROTATE, [this] {
+        change([this] { for(const auto &id : canvas->selected)
+            if(auto p=circuit().part(id)) p->rotation=(p->rotation+1)%4; });
+    });
+    bind(L_RECENT, [this] { recentMenu(); });
+    bind(L_TEMPLATE, [this] {
+        wxArrayString choices; choices.Add(U("空白数字工程")); choices.Add(U("半加器（组合逻辑）"));
+        choices.Add(U("答辩演示：两层实例 / 独立寄存器与 RAM"));
+        wxSingleChoiceDialog dialog(this,U("选择新建工程模板"),U("工程模板"),choices);
+        if(dialog.ShowModal()!=wxID_OK || !discard()) return;
+        stop(); canvas->cancel(); canvas->appearance=false;
+        if(dialog.GetSelection()==2) {
+            // 分发版优先从程序旁读取模板；源码路径仅作为开发构建的后备。
+            auto path=fsPath(wxStandardPaths::Get().GetExecutablePath()).parent_path()/"examples"/"defense-hierarchy.logic.json";
+            if(!std::filesystem::exists(path))
+                path=std::filesystem::path(__FILE__).parent_path().parent_path()/"examples"/"defense-hierarchy.logic.json";
+            history.reset(deserialize(readFile(path)),false);
+        } else history.reset(dialog.GetSelection()==1 ? halfAdder() : Project{});
+        current=history.project.main; savedPath.clear(); scope.clear(); navigation.clear();
+        rebuild(true,true); canvas->fit();
     });
     bind(L_NEW_CIRCUIT, [this] { newCircuit(); });
     bind(L_NEW_COMPONENT, [this] { newComponent(); });
@@ -544,10 +691,11 @@ LogicEditor::LogicEditor(wxWindow *parent)
     bind(L_HELP, [this] {
         showReport(
             "数字逻辑使用说明",
-            "1. 选择左侧七类元件，在画布单击放置，或从库拖入。选择工具下拖动元件，导线跟随引脚。\n"
+             "1. 选择左侧元件，在画布单击放置，或从库拖入。选择工具下拖动元件，导线跟随引脚。\n"
             "2. W 连线：点击引脚开始，空白处设置拐点，点击目标引脚结束。双击空白可结束到节点。\n"
             "3. 点击已有导线可创建分支；交叉不自动连接。J 创建节点；选中节点可设置网络标签。\n"
-            "4. 双击输入/按钮切换；多位值在右侧属性表格编辑。F7 推进一个事件时刻，F8 翻转时钟，F5 运行/暂停。\n"
+            "4. 双击输入/按钮切换；多位值在右侧属性表格编辑。F7 推进一个事件时刻，F8 翻转时钟"
+             "（基础节拍），F5 运行/暂停；仿真菜单可一次推进指定数量的基础节拍。\n"
             "5. 项目菜单新建子电路，用输入/输出引脚定义接口；左侧子电路库放置实例，双击进入。\n"
             "   封装功能将当前电路的副本保存为子电路定义；每个实例的寄存器、RAM 状态独立。\n"
             "6. Ctrl+S 保存整个工程（包括全部子电路）；Ctrl+Z/Y 撤销重做；Ctrl+C/V 使用系统剪贴板。\n"
@@ -557,20 +705,38 @@ LogicEditor::LogicEditor(wxWindow *parent)
             "10. 文件 → 导出网表：导出当前电路及嵌套元件，支持 KiCad .net 和完整数字 .net.json。\n"
             "9. 诊断列表双击定位；事件追踪显示传播时刻与实例路径。复位后可用 F7 从初始队列单步调试。\n"
             "10. 文件 → 打开支持 外部电路 2.7 .circ 受限导入；请查看诊断，保存仍使用 .logic.json。\n"
-            "位宽 1–32；两输入逻辑门；MUX 2:1；译码器 2:4；RAM/ROM 256 字；零扩展器 1→N。\n"
-            "时序元件均为上升沿触发，无异步复位脚；复位操作恢复属性中的初值。\n"
+             "位宽 1–32；多输入逻辑门、可配置选择器、位分组总线、零/符号扩展；RAM/ROM 容量由地址位数设置。\n"
+             "时序元件可配置触发沿；CLR 引脚为异步清零（高电平有效，与时钟无关）；"
+            "计数器 CARRY 在计到位宽最大值时输出 1，可用它级联多级计数器。复位操作恢复属性中的初值。\n"
             "整数运算无符号、结果截断到位宽；加减法 C 表示进位/借位；移位数量由 B 给出。\n"
-            "标准与或式未最小化。Text 是注释。按钮以双击保持切换。\n"
+             "组合分析支持表达式化简、彩色圈组卡诺图、编辑真值表和自动生成门电路。Text 是注释。\n"
+             "按钮可配置保持切换或按下有效；时钟高/低节拍和相位可独立配置。\n"
             "11. 工具菜单：L 直线、B 曲线、R 矩形、E 椭圆、C 圆。拖动绘制，曲线再单击确定弯曲。\n"
-            "12. 编辑元件外观：围绕绿色接口绘制符号；返回电路后实例同步显示。图形不参与电气连接。\n"
+             "12. 编辑元件外观：围绕绿色接口绘制符号，可直接拖动接口，或通过项目菜单精确输入坐标。\n"
+             "14. 双击实例进入真实运行态，返回上级不复位。运行态属性/接口输入只读，内部按钮只影响当前实例。\n"
+             "15. 运行内存只读查看；初值编辑支持 raw HEX 文件。信号监测可选择输出并连续记录 CSV。\n"
             "13. S 选择后拖动图形或控制点；右侧属性面板修改线宽、填充。Shift 约束，Esc 取消。");
     });
     search->Bind(wxEVT_TEXT, [this](wxCommandEvent &) { populate(); });
+    breadcrumbs->Bind(wxEVT_CHOICE, [this](wxCommandEvent &e) {
+        if(e.GetSelection()>=0 && size_t(e.GetSelection())<navigation.size())
+            navigateTo(size_t(e.GetSelection()));
+    });
+    hierarchy->Bind(wxEVT_TREE_ITEM_ACTIVATED, [this](wxTreeEvent &e) {
+        auto item=dynamic_cast<Item*>(hierarchy->GetItemData(e.GetItem()));
+        if(!item) return;
+        auto instancePath=item->circuit;
+        if(instancePath.empty()) { if(!navigation.empty()) navigateTo(0); return; }
+        if(!navigation.empty()) navigateTo(0);
+        std::istringstream path(instancePath); std::string id;
+        while(std::getline(path,id,'/')) if(!id.empty()) enterInstance(id);
+    });
     circuits->Bind(wxEVT_CHOICE, [this](wxCommandEvent &) {
         canvas->cancel();
         stop();
         setAppearance(false);
         current = utf8(circuits->GetStringSelection());
+        scope.clear(); navigation.clear();
         canvas->selected.clear();
         rebuild();
         canvas->fit();
@@ -626,9 +792,13 @@ LogicEditor::LogicEditor(wxWindow *parent)
             return;
         }
         stop();
+        simulator->setTraceSink({}); traceFile.reset();
         e.Skip();
     });
     rebuild(true, true);
+    wxConfig config("PracticeEDA");
+    for(int i=0;i<8;++i) { wxString path; if(config.Read("recent/"+std::to_string(i),&path) && !path.empty())
+        recentFiles.push_back(utf8(path)); }
     Centre();
 }
 void LogicEditor::fail(const std::exception &e) {
@@ -666,10 +836,59 @@ void LogicEditor::populate() {
     tree->Expand(subs);
     tree->Thaw();
 }
+// 刷新界面状态：reset 时重建并稳定仿真器；lib 时重建电路下拉框与元件树。
+std::string LogicEditor::scoped(const std::string &id) const {
+    return scope.empty() ? id : scope + "/" + id;
+}
+Signal LogicEditor::read(const Endpoint &endpoint) const {
+    return simulator->read({scoped(endpoint.object),endpoint.pin});
+}
+void LogicEditor::enterInstance(const std::string &id) {
+    auto part=circuit().part(id);
+    if(!part || part->kind!="Subcircuit") return;
+    std::string child=part->circuit, childScope=scoped(id);
+    canvas->cancel();
+    navigation.push_back({current,scope,canvas->view});
+    current=child; scope=childScope;
+    canvas->appearance=false; canvas->tool="Select"; canvas->selected.clear();
+    rebuild(false,true); canvas->fit();
+}
+void LogicEditor::navigateTo(size_t level) {
+    if(level>=navigation.size()) return;
+    auto destination=navigation[level];
+    canvas->cancel(); current=destination.circuit; scope=destination.scope;
+    navigation.resize(level); canvas->view=destination.view;
+    canvas->selected.clear(); canvas->tool="Select"; canvas->appearance=false;
+    rebuild(false,true);
+}
+void LogicEditor::editDefinition() {
+    // 同一定义可能被多个实例引用。明确离开观察态后，结构修改才允许全局复位。
+    stop(); canvas->cancel(); scope.clear(); navigation.clear(); canvas->selected.clear();
+    rebuild(true,true);
+}
+void LogicEditor::refreshHierarchy() {
+    hierarchy->Freeze(); hierarchy->DeleteAllItems();
+    auto root=hierarchy->AddRoot(U(simulationRoot),-1,-1,new Item("Instance",""));
+    size_t count=0;
+    std::function<void(wxTreeItemId,const std::string&,const std::string&,int)> add;
+    add=[&](wxTreeItemId parent,const std::string &name,const std::string &prefix,int depth) {
+        if(depth>20 || count>2000) return;
+        for(const auto &part:history.project.circuit(name).parts) if(part.kind=="Subcircuit") {
+            auto path=prefix.empty()?part.id:prefix+"/"+part.id;
+            auto child=hierarchy->AppendItem(parent,U((part.label.empty()?part.id:part.label)+" : "+part.circuit),
+                                              -1,-1,new Item("Instance",path));
+            ++count; add(child,part.circuit,path,depth+1);
+        }
+    };
+    add(root,simulationRoot,"",0); hierarchy->Expand(root); hierarchy->Thaw();
+}
 void LogicEditor::rebuild(bool reset, bool lib) {
+    if(!scope.empty() && !reset) { canvas->tool="Select"; canvas->appearance=false; }
     if (reset) {
         stop();
+        scope.clear(); navigation.clear(); simulationRoot=current;
         simulator = std::make_unique<Simulator>(history.project, current);
+        if(traceFile) simulator->setTraceSink([this](const Trace &event) { writeTrace(event); });
         simulator->settle();
         hasTable = false;
     }
@@ -679,13 +898,21 @@ void LogicEditor::rebuild(bool reset, bool lib) {
             circuits->Append(U(c.name));
         circuits->SetStringSelection(U(current));
         populate();
+        refreshHierarchy();
     }
+    breadcrumbs->Clear();
+    for(const auto &level:navigation)
+        breadcrumbs->Append(U((level.scope.empty()?level.circuit:level.scope)+"  /  "+level.circuit));
+    breadcrumbs->Append(U((scope.empty()?current:scope)+"  /  "+current+
+                          (scope.empty()?" · 定义编辑":" · 运行实例")));
+    breadcrumbs->SetSelection(int(navigation.size()));
     SetTitle(U(std::string(history.dirty() ? "* " : "") + history.project.name + " — " + current +
-               " · PracticeEDA 数字逻辑"));
+                (scope.empty()?" · 定义编辑":" · 实例 "+scope) + " · PracticeEDA 数字逻辑"));
     refreshDiagnostics();
     status->SetLabel(
         U("工具：" + canvas->tool + (canvas->tool == "Place" ? " / " + pretty(canvas->placing) : "") +
-          "   |   " + (timer.IsRunning() ? "运行中" : "已暂停") + "   |   t=" +
+          "   |   " + (timer.IsRunning() ? "运行中" : "已暂停") + "   基础节拍=" +
+          std::to_string(simulator->ticks()) + "   |   t=" +
           std::to_string(simulator->time()) + "   待处理事件=" + std::to_string(simulator->pending()) +
           "   |   元件=" + std::to_string(circuit().parts.size()) +
           "   导线=" + std::to_string(circuit().wires.size())));
@@ -759,6 +986,18 @@ void LogicEditor::showDiagnostic(int index, bool locate) {
     if (!locate)
         return;
     auto id = issue.object;
+    // 诊断使用完整实例路径；逐层导航只改变观察上下文，不修改任何运行状态。
+    if(id.find('/')!=std::string::npos) {
+        if(!navigation.empty()) navigateTo(0);
+        while(id.find('/')!=std::string::npos) {
+            auto split=id.find('/'); auto instance=id.substr(0,split);
+            auto part=circuit().part(instance);
+            if(!part || part->kind!="Subcircuit") break;
+            enterInstance(instance); id=id.substr(split+1);
+        }
+    } else if(!scope.empty()) {
+        if(!navigation.empty()) navigateTo(0);
+    }
     std::optional<Point> at;
     auto find = [&] {
         if (auto part = circuit().part(id))
@@ -787,7 +1026,7 @@ void LogicEditor::showDiagnostic(int index, bool locate) {
     canvas->Refresh();
 }
 void LogicEditor::inspect() {
-    // A simulation tick must never overwrite an in-progress cell edit.
+    // 仿真 tick 绝不能覆盖正在进行的单元格编辑。
     if (properties->IsCellEditControlEnabled() && inspectedSelection == canvas->selected)
         return;
     if (properties->IsCellEditControlEnabled()) {
@@ -827,6 +1066,36 @@ void LogicEditor::inspect() {
                                 p->kind != "Decoder" && p->kind != "Encoder";
             if (p->kind != "Text")
                 set(P_WIDTH, std::to_string(p->width), configurable);
+            if(p->kind!="Text") set(P_ROTATION,std::to_string(p->rotation),true);
+            auto param=[&](int row) { auto spec=parameterRows.at(row);
+                set(row,std::to_string(parameter(*p,spec.first,spec.second)),true); };
+            const auto &kind=p->kind;
+            if(kind=="And"||kind=="Or"||kind=="Xor"||kind=="Nand"||kind=="Nor"||kind=="Xnor") {
+                param(P_INPUTS); param(P_INVERT);
+            }
+            if(kind=="Mux"||kind=="Demux"||kind=="Decoder"||kind=="Encoder"||kind=="BitSelector") param(P_SELECT);
+            if(kind=="BitSelector") param(P_OUTPUTWIDTH);
+            if(kind=="BitFinder") param(P_MODE);
+            if(kind=="LEDMatrix") { param(P_ROWS); param(P_COLS); }
+            if(kind=="LEDMatrix"||kind=="SevenSegment") param(P_ACTIVELOW);
+            if(kind=="Extender") { param(P_INPUTWIDTH); param(P_SIGN); }
+            if(kind=="Clock") { param(P_HIGH); param(P_LOW); param(P_PHASE); }
+            if(kind=="DFF"||kind=="TFF"||kind=="JKFF"||kind=="SRFF"||kind=="Register"||
+               kind=="Counter"||kind=="ShiftRegister"||kind=="RAM"||kind=="Random") param(P_FALLING);
+            if(kind=="Counter") { param(P_MAX); param(P_LOAD); }
+            if(kind=="RAM"||kind=="ROM") param(P_ADDR);
+            if(kind=="Button") { param(P_MOMENTARY); param(P_ACTIVELOW); }
+            if(kind=="Transistor") param(P_ACTIVELOW);
+            if(kind=="Splitter"||kind=="Joiner") {
+                std::ostringstream groups;
+                for(size_t group=0;group<p->bitGroups.size();++group) {
+                    if(group) groups << ';';
+                    for(size_t bit=0;bit<p->bitGroups[group].size();++bit) {
+                        if(bit) groups << ','; groups << p->bitGroups[group][bit];
+                    }
+                }
+                set(P_GROUPS,groups.str(),true);
+            }
             bool sourceValue = p->kind == "Input" || p->kind == "Button" || p->kind == "Constant" ||
                                p->kind == "Clock" || p->kind == "DFF" || p->kind == "TFF" ||
                                p->kind == "JKFF" || p->kind == "SRFF" || p->kind == "Register" ||
@@ -844,19 +1113,19 @@ void LogicEditor::inspect() {
                 auto pin = std::find_if(pins.begin(), pins.end(), [](const Port &q) { return q.output; });
                 if (pin == pins.end())
                     pin = pins.begin();
-                set(P_STATE, simulator->read({id, pin->id}).text());
+                set(P_STATE, read({id, pin->id}).text());
             }
         } else {
             for (const auto &n : circuit().nodes)
                 if (n.id == id) {
                     set(P_TYPE, "节点");
                     set(P_LABEL, n.label, true);
-                    set(P_STATE, simulator->read({id, ""}).text());
+                    set(P_STATE, read({id, ""}).text());
                 }
             for (const auto &w : circuit().wires)
                 if (w.id == id) {
                     set(P_TYPE, "导线 / 总线");
-                    set(P_STATE, simulator->read({id, ""}).text());
+                    set(P_STATE, read({id, ""}).text());
                 }
             for (const auto &s : circuit().shapes)
                 if (s.id == id) {
@@ -868,26 +1137,43 @@ void LogicEditor::inspect() {
                 }
         }
     }
+    if(!scope.empty()) {
+        for(int row=0;row<P_COUNT;++row) properties->SetReadOnly(row,1);
+        selection->SetLabel(selection->GetLabel()+U(" · 运行实例只读"));
+    }
     properties->EndBatch();
 }
 void LogicEditor::change(const std::function<void()> &action) {
-    // A failed edit must restore both the full model and the currently open definition.
+    if(!scope.empty()) throw std::runtime_error("当前正在观察运行实例；请先点击顶部“编辑定义（复位）”再修改结构或初值。");
+    // 编辑失败时必须同时恢复完整模型与当前打开的电路定义。
     canvas->cancel();
     auto before = history.project;
+    auto beforeHistory=history;
     auto oldCurrent = current;
+    auto oldRoot=simulationRoot;
+    bool wasRunning=timer.IsRunning();stop();
+    auto previousSimulator=std::move(simulator);
     try {
         action();
         history.project.validate();
+        // 先编译成功，再提交撤销记录。无效参数/断线不能破坏旧运行态。
+        auto candidate=std::make_unique<Simulator>(history.project,current);
+        if(traceFile)candidate->setTraceSink([this](const Trace &event){ writeTrace(event); });
+        candidate->settle();
         history.commit(before);
-        rebuild(true, true);
+        simulator=std::move(candidate);simulationRoot=current;navigation.clear();scope.clear();hasTable=false;
+        rebuild(false, true);
     } catch (...) {
-        history.project = std::move(before);
+        history=std::move(beforeHistory);
         current = oldCurrent;
-        rebuild(true, true);
+        simulationRoot=oldRoot;simulator=std::move(previousSimulator);
+        rebuild(false, true);if(wasRunning)timer.Start(500);
         throw;
     }
 }
+// 把右侧属性表格的编辑写回模型；校验失败时单元格回退并给出提示。
 void LogicEditor::apply() {
+    if(!scope.empty()) throw std::runtime_error("实例属性只读。请先切换到“编辑定义（复位）”。");
     if (!properties->IsReadOnly(P_STROKE, 1)) {
         long stroke;
         if (!properties->GetCellValue(P_STROKE, 1).ToLong(&stroke) || stroke < 1 || stroke > 20)
@@ -922,6 +1208,32 @@ void LogicEditor::apply() {
         uint32_t v = !properties->IsReadOnly(P_VALUE, 1) ? unsignedValue(properties->GetCellValue(P_VALUE, 1))
                                                          : p->value;
         std::vector<uint32_t> data = p->data;
+        int rotation=p->rotation;
+        if(!properties->IsReadOnly(P_ROTATION,1)) {
+            long value;
+            if(!properties->GetCellValue(P_ROTATION,1).ToLong(&value)||value<0||value>3)
+                throw std::runtime_error("朝向应为 0、1、2、3，分别对应东、南、西、北");
+            rotation=int(value);
+        }
+        auto params=p->params;
+        for(const auto &entry:parameterRows) if(!properties->IsReadOnly(entry.first,1)) {
+            auto text=properties->GetCellValue(entry.first,1); long long value;
+            if(!text.ToLongLong(&value)) throw std::runtime_error("参数请输入整数");
+            params[entry.second.first]=value;
+        }
+        auto groups=p->bitGroups;
+        if(!properties->IsReadOnly(P_GROUPS,1)) {
+            groups.clear(); std::istringstream input(utf8(properties->GetCellValue(P_GROUPS,1)));
+            std::string group;
+            while(std::getline(input,group,';')) {
+                std::vector<int> bits; std::istringstream stream(group); std::string bit;
+                while(std::getline(stream,bit,',')) { size_t used=0; int n=std::stoi(bit,&used);
+                    if(used!=bit.size()||n<0||n>=w) throw std::runtime_error("分组格式为 0,1,2,3;4,5,6,7，位编号不能超出位宽");
+                    bits.push_back(n);
+                }
+                if(!bits.empty()) groups.push_back(bits);
+            }
+        }
         if (!properties->IsReadOnly(P_MEMORY, 1)) {
             data.clear();
             std::istringstream in(utf8(properties->GetCellValue(P_MEMORY, 1)));
@@ -929,8 +1241,9 @@ void LogicEditor::apply() {
             while (in >> word)
                 data.push_back(unsignedValue(U(word)));
         }
-        // Poking a source does not reset registers in the running simulation.
-        if ((p->kind == "Input" || p->kind == "Button") && w == p->width && name == p->label) {
+        // 修改输入源不会复位运行中的仿真寄存器。
+        if ((p->kind == "Input" || p->kind == "Button") && w == p->width && name == p->label &&
+            rotation==p->rotation && params==p->params && groups==p->bitGroups) {
             auto before = history.project;
             p->value = v;
             history.commit(before);
@@ -945,6 +1258,7 @@ void LogicEditor::apply() {
             q->width = w;
             q->value = v;
             q->data = data;
+            q->rotation=rotation; q->params=params; q->bitGroups=groups;
         });
     } else
         change([&] {
@@ -979,6 +1293,7 @@ bool LogicEditor::save(bool as) {
         history.project.validate();
         writeAtomic(fsPath(path), serialize(history.project));
         savedPath = utf8(path);
+        rememberFile(savedPath);
         history.markSaved();
         rebuild(false);
         return true;
@@ -1000,6 +1315,7 @@ bool LogicEditor::load(const wxString &path) {
         history.reset(loaded, !isCirc);
         current = loaded.main;
         savedPath = isCirc ? std::string{} : utf8(path);
+        rememberFile(utf8(path));
         canvas->selected.clear();
         rebuild(true, true);
         canvas->fit();
@@ -1027,6 +1343,9 @@ void LogicEditor::copySelection() {
         throw std::runtime_error("剪贴板被占用");
     bool ok =
         wxTheClipboard->SetData(new wxTextDataObject(U(copy(history.project, circuit(), canvas->selected))));
+    // Windows OLE 默认延迟提供数据；立即固化文本，关闭窗口后仍可在另一个工程粘贴。
+    if (ok)
+        wxTheClipboard->Flush();
     wxTheClipboard->Close();
     if (!ok)
         throw std::runtime_error("复制失败");
@@ -1074,6 +1393,7 @@ void LogicEditor::removeSelection() {
     });
 }
 void LogicEditor::setAppearance(bool enabled) {
+    if(enabled && !scope.empty()) throw std::runtime_error("请先进入定义编辑再修改元件外观");
     if (canvas->appearance == enabled)
         return;
     canvas->cancel();
@@ -1144,7 +1464,7 @@ void LogicEditor::newComponent() {
 
 void LogicEditor::saveComponent() {
     properties->SaveEditControlValue();
-    // Finish/cancel an in-progress gesture before serializing the committed definition.
+    // 序列化已提交的定义前，先结束/取消进行中的手势。
     canvas->cancel();
     const auto bytes = exportComponent(history.project, current);
     wxFileDialog dialog(this, U("保存当前电路为自定义元件"), "", "custom.component.json",
@@ -1165,7 +1485,7 @@ void LogicEditor::loadComponent() {
     const auto bytes = readFile(fsPath(dialog.GetPath()));
     std::string name;
     change([&] { name = importComponent(history.project, bytes); });
-    // Import adds definitions only; selecting placement does not alter the active circuit.
+    // 导入只增加定义；选择放置不会改变当前电路。
     setAppearance(false);
     canvas->tool = "Place";
     canvas->placing = "Subcircuit";
@@ -1177,12 +1497,21 @@ void LogicEditor::loadComponent() {
 void LogicEditor::exportNetlist() {
     canvas->cancel();
     wxFileDialog dialog(this, U("导出当前电路网表（包含嵌套元件）"), "", "circuit.net",
-                        U("KiCad 逻辑连接网表 (*.net)|*.net|完整数字网表 (*.net.json)|*.net.json"),
+                        U("逻辑连接网表 (*.net)|*.net|完整数字网表 (*.net.json)|*.net.json|KiCad实体映射网表 (*.physical.net)|*.physical.net"),
                         wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     dialog.SetName("export-netlist-dialog");
     if (dialog.ShowModal() != wxID_OK)
         return;
-    // Compile the committed project separately: live input changes, RAM and clock state stay intact.
+    if(dialog.GetFilterIndex()==2) {
+        auto result=exportPcb(history.project,current);auto file=fsPath(dialog.GetPath());
+        auto board=file;board.replace_extension(".kicad_pcb");auto mapping=file;mapping.replace_extension(".mapping.json");
+        writeAtomic(file,result.netlist);writeAtomic(board,result.board);writeAtomic(mapping,result.manifest);
+        showReport("实体映射已导出","已生成标准.net网表、对应.kicad_pcb和引脚映射JSON。\n"
+                   "范围：单比特二输入AND/OR/NAND/XOR及NOT，包含嵌套展开、电源、去耦和连接器。\n"
+                   "每个门使用独立DIP芯片；未布线，需在PCB软件中继续布局、布线和规则验证。\n"+board.u8string());
+        return;
+    }
+    // 单独编译已提交的工程：实时输入变化、RAM 与时钟状态保持不变。
     Simulator compiled(history.project, current);
     writeAtomic(fsPath(dialog.GetPath()), compiled.netlist(dialog.GetFilterIndex() == 0));
 }
@@ -1233,6 +1562,9 @@ void LogicEditor::encapsulate() {
             w.a.object = ids.at(w.a.object);
             w.b.object = ids.at(w.b.object);
         }
+        std::map<std::string,Point> copiedLayout;
+        for(const auto &pin:c.interfaceLayout) copiedLayout[ids.at(pin.first)]=pin.second;
+        c.interfaceLayout=std::move(copiedLayout);
         history.project.circuits.push_back(c);
     });
 }
@@ -1276,9 +1608,106 @@ void LogicEditor::showReport(const std::string &title, const std::string &conten
     d.ShowModal();
 }
 void LogicEditor::showTable(Table table) {
-    lastTable = std::move(table);
-    hasTable = true;
-    showReport("真值表 / 等价表达式（文件菜单可导出 CSV）", lastTable.report());
+    validateTable(table);
+    wxDialog dialog(this,wxID_ANY,U("组合分析 · 真值表 / 化简 / 卡诺图 / 自动生成"),wxDefaultPosition,
+                    {1060,760},wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER);
+    auto sizer=new wxBoxSizer(wxVERTICAL);
+    sizer->Add(new wxStaticText(&dialog,wxID_ANY,U("输出列可编辑：0、1 或 -（设计不关心）。输入列固定；分析与生成使用当前表格。")),0,wxALL,10);
+    auto grid=new wxGrid(&dialog,wxID_ANY); grid->SetName("editable-truth-table"); grid->CreateGrid(0,0);
+    auto fill=[&] {
+        if(grid->GetNumberRows()) grid->DeleteRows(0,grid->GetNumberRows());
+        if(grid->GetNumberCols()) grid->DeleteCols(0,grid->GetNumberCols());
+        grid->AppendCols(int(table.inputs.size()+table.outputs.size())); grid->AppendRows(int(table.rows.size()));
+        for(size_t column=0;column<table.inputs.size()+table.outputs.size();++column) {
+            bool output=column>=table.inputs.size();
+            grid->SetColLabelValue(int(column),U((output?"输出 · ":"输入 · ")+
+                (output?table.outputs[column-table.inputs.size()]:table.inputs[column])));
+            grid->SetColSize(int(column),110);
+            for(size_t row=0;row<table.rows.size();++row) {
+                grid->SetCellValue(int(row),int(column),table.rows[row][column]<0?"-":std::to_string(table.rows[row][column]));
+                grid->SetReadOnly(int(row),int(column),!output);
+                if(output) grid->SetCellBackgroundColour(int(row),int(column),wxColour("#eefbf3"));
+            }
+        }
+    };
+    auto collect=[&] {
+        if(grid->IsCellEditControlEnabled()) grid->SaveEditControlValue();
+        for(size_t row=0;row<table.rows.size();++row) for(size_t column=table.inputs.size();column<table.rows[row].size();++column) {
+            auto value=grid->GetCellValue(int(row),int(column)); value.Trim().Trim(false);
+            if(value!="0"&&value!="1"&&value!="-") throw std::runtime_error("输出仅允许 0、1、-，请检查第 "+std::to_string(row+1)+" 行");
+            table.rows[row][column]=value=="-"?-1:value=="1"?1:0;
+        }
+        validateTable(table); lastTable=table; hasTable=true;
+    };
+    fill(); sizer->Add(grid,1,wxEXPAND|wxLEFT|wxRIGHT,10);
+    auto actions=new wxBoxSizer(wxHORIZONTAL);
+    auto add=[&](const char *caption,std::function<void()> action) {
+        auto button=new wxButton(&dialog,wxID_ANY,U(caption)); actions->Add(button,0,wxRIGHT,8);
+        button->Bind(wxEVT_BUTTON,[&,action](wxCommandEvent &) { try { collect();action(); }
+            catch(const std::exception &error){wxMessageBox(U(error.what()),U("分析失败"),wxOK|wxICON_ERROR,&dialog);} });
+    };
+    add("化简表达式",[&] { showReport("化简表达式",analysisReport(table)); });
+    add("卡诺图 / 圈组",[&] {
+        wxArrayString outputs;for(const auto &name:table.outputs) outputs.Add(U(name));
+        wxSingleChoiceDialog choice(&dialog,U("选择输出函数"),U("卡诺图"),outputs);
+        if(choice.ShowModal()!=wxID_OK)return; size_t output=size_t(choice.GetSelection());
+        if(table.inputs.size()>4) { showReport("化简 / 卡诺图说明",karnaughReport(table,output));return; }
+        auto minimized=minimizeOutput(table,output);size_t rbits=table.inputs.size()/2,cbits=table.inputs.size()-rbits;
+        wxDialog map(&dialog,wxID_ANY,U("卡诺图 · "+table.outputs[output]),wxDefaultPosition,{800,650},wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER);
+        auto box=new wxBoxSizer(wxVERTICAL);auto groups=new wxChoice(&map,wxID_ANY);
+        groups->Append(U("显示所有圈组"));for(size_t i=0;i<minimized.terms.size();++i)groups->Append(U("圈组 "+std::to_string(i+1)));
+        groups->SetSelection(0);box->Add(groups,0,wxEXPAND|wxALL,10);
+        auto cells=new wxGrid(&map,wxID_ANY);cells->CreateGrid(1<<rbits,1<<cbits);cells->EnableEditing(false);
+        cells->SetDefaultCellAlignment(wxALIGN_CENTER,wxALIGN_CENTER);cells->SetDefaultRowSize(66);cells->SetDefaultColSize(100);
+        auto binary=[](size_t value,size_t bits){std::string result;for(size_t bit=0;bit<bits;++bit)result+=((value>>(bits-bit-1))&1)?'1':'0';return result.empty()?"-":result;};
+        for(int row=0;row<cells->GetNumberRows();++row)cells->SetRowLabelValue(row,U(binary(size_t(row)^(size_t(row)>>1),rbits)));
+        for(int col=0;col<cells->GetNumberCols();++col)cells->SetColLabelValue(col,U(binary(size_t(col)^(size_t(col)>>1),cbits)));
+        auto colour=[&] {
+            const char *palette[]={"#bbf7d0","#bfdbfe","#fde68a","#ddd6fe","#fecdd3","#a5f3fc"};
+            for(int row=0;row<cells->GetNumberRows();++row)for(int col=0;col<cells->GetNumberCols();++col){
+                size_t rg=size_t(row)^(size_t(row)>>1),cg=size_t(col)^(size_t(col)>>1);uint32_t code=0;
+                for(size_t bit=0;bit<rbits;++bit)code|=uint32_t((rg>>(rbits-bit-1))&1)<<bit;
+                for(size_t bit=0;bit<cbits;++bit)code|=uint32_t((cg>>(cbits-bit-1))&1)<<(rbits+bit);
+                auto record=std::find_if(table.rows.begin(),table.rows.end(),[&](const auto &values){uint32_t value=0;for(size_t i=0;i<table.inputs.size();++i)value|=uint32_t(values[i])<<i;return value==code;});
+                int value=(*record)[table.inputs.size()+output];std::string caption=value<0?"-":std::to_string(value),membership;
+                wxColour background("#ffffff");int chosen=groups->GetSelection()-1;
+                for(size_t group=0;group<minimized.terms.size();++group){const auto &term=minimized.terms[group];
+                    if((code&~term.dontCare)==(term.bits&~term.dontCare)){
+                        if(!membership.empty())membership+=",";membership+=std::to_string(group+1);
+                        if(chosen<0||chosen==int(group))background=wxColour(palette[group%6]);
+                    }
+                }
+                cells->SetCellValue(row,col,U(caption+(membership.empty()?"":"  ["+membership+"]")));
+                cells->SetCellBackgroundColour(row,col,background);
+            }cells->ForceRefresh();
+        };
+        colour();groups->Bind(wxEVT_CHOICE,[&](wxCommandEvent &){colour();});
+        box->Add(cells,1,wxEXPAND|wxLEFT|wxRIGHT,10);
+        auto explanation=new wxTextCtrl(&map,wxID_ANY,U(karnaughReport(table,output)),wxDefaultPosition,{750,170},wxTE_MULTILINE|wxTE_READONLY);
+        explanation->SetFont(wxFontInfo(10).Family(wxFONTFAMILY_TELETYPE));box->Add(explanation,0,wxEXPAND|wxALL,10);
+        box->Add(map.CreateButtonSizer(wxOK),0,wxEXPAND|wxALL,10);map.SetSizer(box);map.ShowModal();
+    });
+    add("自动生成门电路…",[&] {
+        if(!scope.empty())throw std::runtime_error("请先返回定义编辑再导入生成电路");
+        wxTextEntryDialog name(&dialog,U("生成的新子电路名称"),U("生成门电路"),U("generated"));if(name.ShowModal()!=wxID_OK)return;
+        wxArrayString modes;modes.Add(U("与 / 或 / 非门"));modes.Add(U("仅 NAND 门"));
+        wxSingleChoiceDialog mode(&dialog,U("选择实现形式；生成后逐行验证真值表"),U("逻辑综合"),modes);if(mode.ShowModal()!=wxID_OK)return;
+        auto generated=synthesize(table,utf8(name.GetValue()),mode.GetSelection()==1);
+        auto package=exportComponent(generated,generated.main);std::string imported;
+        change([&]{imported=importComponent(history.project,package);current=imported;canvas->selected.clear();});
+        canvas->fit();hasTable=true;lastTable=table;
+        wxMessageBox(U("已生成并验证子电路："+imported+"。原有工程电路已保留。"),U("逻辑综合"),wxOK|wxICON_INFORMATION,&dialog);
+    });
+    add("导入 CSV…",[&] {
+        wxFileDialog file(&dialog,U("导入真值表 CSV"),"","","CSV (*.csv)|*.csv",wxFD_OPEN|wxFD_FILE_MUST_EXIST);
+        if(file.ShowModal()==wxID_OK){table=parseTruthCsv(readFile(fsPath(file.GetPath())));fill();}
+    });
+    add("导出 CSV…",[&] {
+        wxFileDialog file(&dialog,U("导出真值表 CSV"),"","truth-table.csv","CSV (*.csv)|*.csv",wxFD_SAVE|wxFD_OVERWRITE_PROMPT);
+        if(file.ShowModal()==wxID_OK)writeAtomic(fsPath(file.GetPath()),"\xEF\xBB\xBF"+table.csv());
+    });
+    sizer->Add(actions,0,wxALL,10);sizer->Add(dialog.CreateButtonSizer(wxOK),0,wxEXPAND|wxALL,10);
+    dialog.SetSizer(sizer);dialog.ShowModal();collect();
 }
 LogicCanvas::LogicCanvas(LogicEditor *editor, wxWindow *parent)
     : wxPanel(parent, wxID_ANY), owner(editor), rippleTimer(this) {
@@ -1344,13 +1773,41 @@ LogicCanvas::LogicCanvas(LogicEditor *editor, wxWindow *parent)
         Refresh();
     });
     Bind(wxEVT_MOUSE_CAPTURE_LOST, [this](wxMouseCaptureLostEvent &) { cancel(); });
-    Bind(wxEVT_RIGHT_DOWN, [this](wxMouseEvent &) {
+    Bind(wxEVT_RIGHT_DOWN, [this](wxMouseEvent &event) {
         cancel();
         tool = "Select";
-        owner->rebuild(false);
+        auto id=hit(view.world({double(event.GetX()),double(event.GetY())}));
+        if(!id.empty()) selected={id};
+        owner->inspect(); Refresh();
+        wxMenu menu;
+        auto add=[&](int command,const char *caption) { menu.Append(command,U(caption)); };
+        auto part=owner->circuit().part(id);
+        int enterCommand=wxID_NONE;
+        if(part && part->kind=="Subcircuit") {
+            enterCommand=wxWindow::NewControlId(); menu.Append(enterCommand,U("进入该运行实例"));
+        }
+        if(!owner->scope.empty()) { add(L_UP,"返回上级实例"); add(L_EDIT_DEFINITION,"编辑定义（暂停并复位）"); }
+        else { add(wxID_COPY,"复制"); add(wxID_CUT,"剪切"); add(wxID_PASTE,"粘贴");
+               add(wxID_DELETE,"删除"); if(part) add(L_ROTATE,"顺时针旋转"); }
+        if(part && (part->kind=="RAM"||part->kind=="ROM")) {
+            add(L_MEMORY_RUNTIME,"查看运行内存"); if(owner->scope.empty()) add(L_MEMORY_INITIAL,"编辑初始内容");
+        }
+        if(part && (part->kind=="Keyboard"||part->kind=="TTY"||part->kind=="Joystick")) add(L_TEXT_DEVICE,"输入 / 查看内容");
+        add(L_MONITOR,"监测信号 / CSV日志"); add(L_FIT,"适合画面");
+        menu.Bind(wxEVT_MENU,[this,id,enterCommand](wxCommandEvent &command) {
+            if(command.GetId()==enterCommand) { owner->enterInstance(id); return; }
+            wxCommandEvent forwarded(wxEVT_MENU,command.GetId()); owner->GetEventHandler()->ProcessEvent(forwarded);
+        });
+        PopupMenu(&menu);
     });
 }
 void LogicCanvas::cancel() {
+    if(!pressedButton.empty()) {
+        auto path=pressedButton; pressedButton.clear();auto split=path.find_last_of('/');
+        auto id=split==std::string::npos?path:path.substr(split+1);auto part=owner->circuit().part(id);
+        owner->simulator->setInput(path,part && parameter(*part,"activeLow",0)?1:0);owner->simulator->settle();
+    }
+    draggedInterface.clear();
     draft.reset();
     curveControl = false;
     shapeHandle = -1;
@@ -1427,7 +1884,7 @@ void LogicCanvas::updatePinHover() {
 void LogicCanvas::drawPinHover(wxGraphicsContext &g) {
     if (!hoveredPin)
         return;
-    // Draw in screen coordinates: zooming changes neither the hint nor its hit radius.
+    // 用屏幕坐标绘制：缩放既不改变提示外观，也不改变命中半径。
     auto at = view.screen(hoverAt);
     double scale = GetDPIScaleFactor();
     g.PushState();
@@ -1455,8 +1912,9 @@ std::string LogicCanvas::hit(Point at) const {
         return {};
     }
     for (auto i = c.parts.rbegin(); i != c.parts.rend(); ++i) {
+        auto local = at - i->at;
+        for(int rotation=0;rotation<i->rotation;++rotation) local={local.y,-local.x};
         if (i->kind == "Input" || i->kind == "Output") {
-            auto local = at - i->at;
             double side = i->kind == "Input" ? 1 : -1;
             if ((std::abs(local.x) <= 18 && std::abs(local.y) <= 18) ||
                 segmentDistance(local, {side * 14, 0}, {side * 70, 0}) <= 5 / view.zoom)
@@ -1465,9 +1923,9 @@ std::string LogicCanvas::hit(Point at) const {
         }
         if (i->kind == "Subcircuit")
             for (const auto &s : p.circuit(i->circuit).shapes)
-                if (s.appearance && shapeHit(s, at - i->at, 6 / view.zoom))
+                if (s.appearance && shapeHit(s, local, 6 / view.zoom))
                     return i->id;
-        if (std::abs(at.x - i->at.x) < 62 && std::abs(at.y - i->at.y) < partHeight(p, *i) / 2)
+        if (std::abs(local.x) < 62 && std::abs(local.y) < partHeight(p, *i) / 2)
             return i->id;
     }
     for (auto &n : c.nodes)
@@ -1516,6 +1974,7 @@ Endpoint LogicCanvas::endpointAt(Point at) {
     return {id, ""};
 }
 void LogicCanvas::route(Point at, bool freeEnd) {
+    if(!owner->scope.empty()) throw std::runtime_error("运行实例仅供观察，请切换到定义编辑后布线");
     auto &p = owner->history.project;
     if (!start) {
         before = p;
@@ -1615,6 +2074,25 @@ void LogicCanvas::leftDown(wxMouseEvent &e) {
     SetFocus();
     Point at = view.world({double(e.GetX()), double(e.GetY())});
     mouse = at;
+    auto pressed=owner->circuit().part(hit(at));
+    if(tool=="Select" && pressed && pressed->kind=="Button" && parameter(*pressed,"momentary",0)) {
+        pressedButton=owner->scoped(pressed->id);
+        owner->simulator->setInput(pressedButton,parameter(*pressed,"activeLow",0)?0:1);
+        owner->simulator->settle(); owner->rebuild(false);
+        if(!HasCapture()) CaptureMouse(); return;
+    }
+    if(!owner->scope.empty()) {
+        auto id=hit(at); selected.clear(); if(!id.empty()) selected.insert(id);
+        owner->inspect(); Refresh(); return;
+    }
+    if(appearance && tool=="Select") {
+        Part instance; instance.kind="Subcircuit"; instance.circuit=owner->current;
+        for(const auto &pin:ports(owner->history.project,instance))
+            if(distance(at,pin.at)<10/view.zoom) {
+                before=owner->history.project; draggedInterface=pin.id; dragging=true;
+                if(!HasCapture()) CaptureMouse(); return;
+            }
+    }
     if (shapeKind(tool)) {
         if (draft && curveControl) {
             updateDraft(at, e.ShiftDown());
@@ -1726,6 +2204,9 @@ void LogicCanvas::motion(wxMouseEvent &e) {
         Refresh();
         return;
     }
+    if(dragging && !draggedInterface.empty() && e.LeftIsDown()) {
+        owner->circuit().interfaceLayout[draggedInterface]=snap(mouse,10); Refresh(); return;
+    }
     if (dragging && shapeHandle >= 0 && e.LeftIsDown()) {
         for (auto &s : owner->circuit().shapes)
             if (selected.count(s.id)) {
@@ -1751,6 +2232,14 @@ void LogicCanvas::motion(wxMouseEvent &e) {
     updatePinHover();
 }
 void LogicCanvas::leftUp(wxMouseEvent &event) {
+    if(!pressedButton.empty()) {
+        auto path=pressedButton; pressedButton.clear();
+        auto split=path.find_last_of('/');
+        auto id=split==std::string::npos?path:path.substr(split+1);
+        auto part=owner->circuit().part(id);
+        owner->simulator->setInput(path,part && parameter(*part,"activeLow",0)?1:0);
+        owner->simulator->settle(); if(HasCapture()) ReleaseMouse(); owner->rebuild(false); return;
+    }
     if (draft) {
         updateDraft(view.world({double(event.GetX()), double(event.GetY())}), event.ShiftDown());
         if (HasCapture())
@@ -1776,6 +2265,7 @@ void LogicCanvas::leftUp(wxMouseEvent &event) {
         }
         owner->history.commit(saved);
         shapeHandle = -1;
+        draggedInterface.clear();
         before.reset();
         dragging = false;
         if (HasCapture())
@@ -1821,9 +2311,15 @@ void LogicCanvas::doubleClick(wxMouseEvent &e) {
     auto p = owner->circuit().part(id);
     if (!p)
         return;
-    if (p->kind == "Input" || p->kind == "Button") {
+    if(p->kind=="Button" && parameter(*p,"momentary",0)) return;
+    if ((p->kind == "Input" && owner->scope.empty()) || p->kind == "Button") {
         cancel();
         p = owner->circuit().part(id);
+        if(!owner->scope.empty()) {
+            auto live=owner->read({id,"Y"});
+            owner->simulator->setInput(owner->scoped(id),live.defined() && live.value ? 0 : 1);
+            owner->simulator->settle(); owner->rebuild(false); return;
+        }
         auto saved = owner->history.project;
         p->value = p->value ? 0 : 1;
         owner->history.commit(saved);
@@ -1831,24 +2327,28 @@ void LogicCanvas::doubleClick(wxMouseEvent &e) {
         owner->simulator->settle();
         owner->rebuild(false);
     } else if (p->kind == "Subcircuit") {
-        auto name = p->circuit;
-        cancel();
-        owner->stop();
-        owner->current = name;
-        selected.clear();
-        owner->rebuild(true, true);
-        fit();
+        owner->enterInstance(id);
+    } else if(p->kind=="RAM" || p->kind=="ROM") {
+        selected={id}; owner->memoryEditor(!owner->scope.empty());
+    } else if(p->kind=="Keyboard" || p->kind=="TTY" || p->kind=="Joystick") {
+        selected={id}; owner->textDevice();
     } else {
         selected = {id};
         owner->inspect();
-        owner->properties->SetFocus();
-        owner->properties->SetGridCursor(P_LABEL, 1);
-        owner->properties->EnableCellEditControl();
+        if(owner->scope.empty()) {
+            owner->properties->SetFocus();
+            owner->properties->SetGridCursor(P_LABEL, 1);
+            owner->properties->EnableCellEditControl();
+        }
     }
 }
 void LogicCanvas::key(wxKeyEvent &e) {
     try {
         int code = e.GetKeyCode();
+        if(e.AltDown() && code==WXK_UP) {
+            if(!owner->navigation.empty()) owner->navigateTo(owner->navigation.size()-1);
+            return;
+        }
         if (code == WXK_ESCAPE) {
             cancel();
             tool = "Select";
@@ -1899,6 +2399,7 @@ void LogicCanvas::paint(wxPaintEvent &) {
     if (g)
         render(*g, GetClientSize());
 }
+// 画布渲染主入口，按图层顺序绘制。clean=true 用于 PNG 导出（去掉网格、选中框、涟漪）。
 void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
     auto &project = owner->history.project;
     auto &c = owner->circuit();
@@ -1916,7 +2417,7 @@ void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
         if (s.appearance == appearance)
             drawShape(g, s, !clean && selected.count(s.id), false, view.zoom);
     if (appearance) {
-        // Show the same stable terminals that instances expose, without simulating the artwork.
+        // 显示与实例暴露相同的稳定端子，而不仿真外观图形。
         Part instance;
         instance.kind = "Subcircuit";
         instance.circuit = c.name;
@@ -1940,15 +2441,23 @@ void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
         std::set<std::string> bad;
         for (auto &i : owner->issues)
             if (i.severity == "error")
-                bad.insert(i.object);
+                {
+                    auto object=i.object;
+                    if(!owner->scope.empty()) {
+                        auto prefix=owner->scope+"/";
+                        if(object.rfind(prefix,0)!=0) continue;
+                        object=object.substr(prefix.size());
+                    }
+                    bad.insert(object.substr(0,object.find('/')));
+                }
         for (auto &w : c.wires) {
-            auto signal = owner->simulator->read({w.id, ""});
+            auto signal = owner->read({w.id, ""});
             g.SetPen(wxPen(!clean && selected.count(w.id) ? wxColour("#6366f1") : signalColour(signal),
                            signal.width > 1 ? 4 : 2));
             line(g, wirePoints(project, c, w));
         }
         for (auto &n : c.nodes) {
-            auto s = owner->simulator->read({n.id, ""});
+            auto s = owner->read({n.id, ""});
             g.SetPen(wxPen(signalColour(s)));
             g.SetBrush(wxBrush(!clean && selected.count(n.id) ? wxColour("#6366f1") : signalColour(s)));
             g.DrawEllipse(n.at.x - 4, n.at.y - 4, 8, 8);
@@ -1957,7 +2466,7 @@ void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
         }
         for (auto &p : c.parts)
             drawSymbol(
-                g, project, p, [&](const Port &pin) { return owner->simulator->read({p.id, pin.id}); },
+                g, project, p, [&](const Port &pin) { return owner->read({p.id, pin.id}); },
                 !clean && selected.count(p.id), bad.count(p.id) != 0);
         if (!clean && start) {
             g.SetPen(wxPen(wxColour("#6366f1"), 2, wxPENSTYLE_SHORT_DASH));
@@ -1966,7 +2475,7 @@ void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
             ps.push_back(snap(mouse, 10));
             line(g, orthogonal(ps));
         }
-    } // schematic layer
+    } // 原理图层
     if (!clean && draft)
         drawShape(g, *draft, true, true, view.zoom);
     if (!clean && box) {
@@ -2016,21 +2525,23 @@ std::pair<Point, Point> bounds(const Project &p, const Circuit &c, bool appearan
         double h = partHeight(p, instance);
         add({-130, -h / 2 - 30});
         add({130, h / 2 + 30});
+        for(const auto &pin:ports(p,instance)) { add(pin.at-Point{80,30});add(pin.at+Point{80,30}); }
         return {lo, hi};
     }
     for (auto &q : c.parts) {
+        auto addLocal=[&](Point point) { for(int turn=0;turn<q.rotation;++turn)point={-point.y,point.x};add(q.at+point); };
         if (q.kind == "Subcircuit")
             for (const auto &s : p.circuit(q.circuit).shapes)
                 if (s.appearance) {
                     auto b = shapeBounds(s);
                     double margin = s.stroke / 2 + 6;
-                    add(q.at + b.first - Point{std::max(105.0, margin), margin + 35});
-                    add(q.at + b.second + Point{std::max(105.0, margin), margin + 40});
+                    addLocal(b.first - Point{std::max(105.0, margin), margin + 35});
+                    addLocal(b.second + Point{std::max(105.0, margin), margin + 40});
                 }
         double h = partHeight(p, q);
         double half = std::max(105.0, double(q.label.size()) * 7);
-        add({q.at.x - half, q.at.y - h / 2 - 35});
-        add({q.at.x + half, q.at.y + h / 2 + 40});
+        addLocal({-half,-h/2-35});addLocal({half,h/2+40});
+        for(const auto &pin:ports(p,q)) { add(q.at+pin.at-Point{20,20});add(q.at+pin.at+Point{20,20}); }
     }
     for (auto &n : c.nodes) {
         add(n.at - Point{10, 30});
@@ -2054,10 +2565,14 @@ void LogicCanvas::fit() {
     view.offset = Point{size.x / 2.0, size.y / 2.0} - (b.first + b.second) * (view.zoom / 2);
     Refresh();
 }
-void LogicCanvas::exportPng(const wxString &path) {
+void LogicCanvas::exportPng(const wxString &path, double requestedScale) {
     auto b = bounds(owner->history.project, owner->circuit(), appearance);
     auto extent = b.second - b.first;
-    double scale = std::min(1.5, 8000 / std::max(extent.x + 60, extent.y + 60));
+    if(!std::isfinite(requestedScale) || requestedScale<=0)
+        throw std::runtime_error("导出比例必须为正数");
+    // 同时限制最长边和总像素；大型导入电路应自动降采样，不能在默认比例下无法导出。
+    double scale = std::min({requestedScale, 8000 / std::max(extent.x + 60, extent.y + 60),
+                             std::sqrt(32000000.0/((extent.x+60)*(extent.y+60)))});
     int w = std::max(1, int((extent.x + 60) * scale)), h = std::max(1, int((extent.y + 60) * scale));
     if (int64_t(w) * h > 32000000)
         throw std::runtime_error("导出图像超过 3200 万像素，请缩小电路范围");
@@ -2147,7 +2662,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     }
     if (!atlas.ConvertToImage().SaveFile(wxString((folder / "logic-icons.png").wstring()), wxBITMAP_TYPE_PNG))
         throw std::runtime_error("icon atlas export failed");
-    // Exercise the same vector renderer used by canvas, preview and PNG export.
+    // 复用画布、预览与 PNG 导出使用的同一套矢量渲染器。
     Project symbols = halfAdder();
     const auto beforeSymbols = serialize(symbols);
     std::vector<Part> specimens;
@@ -2204,7 +2719,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     }
     if (serialize(symbols) != beforeSymbols)
         throw std::runtime_error("rendering changed the circuit model");
-    // Raster evidence of all five signal states on both compact I/O bodies.
+    // 输出五种信号状态在紧凑 I/O 主体上的栅格证据。
     wxBitmap ioSheet(760, 540, 32);
     std::vector<Signal> ioStates{Signal::number(0, 1), Signal::number(1, 1), Signal::unknown(1),
                                  Signal::floating(1), Signal::failure(1)};
@@ -2241,7 +2756,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     if (bodyColours.size() != 5)
         throw std::runtime_error("I/O states need distinct body colours");
     ioImage.SaveFile(wxString((folder / "io-signal-states.png").wstring()), wxBITMAP_TYPE_PNG);
-    // Reproduce the user's Input -> NOT -> Output circuit with unchanged anchors.
+    // 复现用户“输入 → 非门 → 输出”电路，锚点保持不变。
     Project inverter;
     inverter.nextId = 3;
     Part input, gate, output;
@@ -2275,7 +2790,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
                 throw std::runtime_error("symbol terminal no longer matches connection hit target");
         }
     canvas->exportPng(wxString((folder / "logic-inverter.png").wstring()));
-    // Hover must follow the same nearest endpoint as wiring, without clock ticks or edits.
+    // 悬停必须使用与布线相同的最近端点判定，且不产生时钟 tick 或编辑。
     Layout();
     const auto hoverProject = serialize(history.project);
     const auto hoverTime = simulator->time();
@@ -2302,7 +2817,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
         if (canvas->hoveredPin || canvas->rippleTimer.IsRunning())
             throw std::runtime_error("pin hover remained outside connection radius");
     }
-    // At low zoom, a nearby junction must win over an earlier, more distant part pin.
+    // 低缩放时，近处的节点必须胜过列表中更靠前但更远的元件引脚。
     circuit().nodes.push_back({"hoverNode", "", hoverAnchor + Point{0, 2}});
     canvas->view.zoom = 0.25;
     auto nearNode = canvas->pinAt(hoverAnchor + Point{0, 2});
@@ -2489,7 +3004,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
         canvas->fit();
         canvas->exportPng(wxString((folder / ("logic-" + name + ".png")).wstring()));
     }
-    // Exercise the actual custom-component dialog, then the same history/library/canvas paths as users.
+    // 验证真实的自定义元件对话框，以及用户会走的历史/库/画布路径。
     for (int id : {L_NEW_COMPONENT, L_SAVE_COMPONENT, L_LOAD_COMPONENT, L_NETLIST})
         if (!GetMenuBar()->FindItem(id))
             throw std::runtime_error("feature menu item missing");
@@ -2532,7 +3047,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     canvas->place({360, 180});
     const auto customInstanceId = circuit().parts.back().id;
     change([&] {
-        // Mirror the imported interface to make a complete, testable top-level half adder.
+        // 复制导入的接口，组成一个完整、可测试的顶层半加器。
         auto customPorts = history.project.circuit(definition).parts;
         for (const auto &port : customPorts) {
             if (port.kind != "Input" && port.kind != "Output")
@@ -2559,17 +3074,25 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     canvas->selected.clear();
     canvas->exportPng(wxString((folder / "custom-half-adder.png").wstring()));
     history.markSaved();
-    // Import through the same load/save paths used by the file menu and command line.
+    // 通过文件菜单与命令行相同的加载/保存路径进行导入。
     auto circExample =
         std::filesystem::path(__FILE__).parent_path().parent_path() / "examples" / "circ-limited.circ";
     auto circSource = folder / std::filesystem::u8path("受限导入.CIRC");
     auto circBytes = readFile(circExample);
+    // 加法器现已支持；在烟测副本中插入真正未知器件和斜线，继续覆盖持久诊断。
+    auto unsupported=circBytes.find("name=\"Adder\"");
+    if(unsupported!=std::string::npos)circBytes.replace(unsupported,std::string("name=\"Adder\"").size(),"name=\"UnsupportedSmokeDevice\"");
+    auto closingCircuit=circBytes.find("</circuit>");
+    circBytes.insert(closingCircuit,"<wire from=\"(900,900)\" to=\"(910,910)\"/>\n");
     writeAtomic(circSource, circBytes);
     if (!load(wxString(circSource.wstring())) || !savedPath.empty() || !history.dirty())
         throw std::runtime_error("外部电路 import must be unsaved and have no native saved path");
     auto importedNotes = circDiagnostics(circuit());
-    if (importedNotes.size() != 2 || issues.size() < importedNotes.size())
+    if (importedNotes.size() < 2 || issues.size() < importedNotes.size())
         throw std::runtime_error("外部电路 diagnostics missing");
+    if(std::none_of(importedNotes.begin(),importedNotes.end(),[](const Issue &note){return note.message.find("UnsupportedSmokeDevice")!=std::string::npos;}) ||
+       std::none_of(importedNotes.begin(),importedNotes.end(),[](const Issue &note){return note.message.find("斜向")!=std::string::npos;}))
+        throw std::runtime_error("unsupported device or diagonal wire diagnostic was not retained");
     rebuild(true, true);
     if (issues.front().object != importedNotes.front().object)
         throw std::runtime_error("外部电路 diagnostics lost after simulator rebuild");
@@ -2581,13 +3104,13 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     savedPath = circSource.u8string();
     if (!save() || readFile(circSource) != circBytes || savedPath == circSource.u8string())
         throw std::runtime_error("外部电路 source overwritten or native save failed");
-    if (!load(U(savedPath)) || circDiagnostics(circuit()).size() != 2)
+    if (!load(U(savedPath)) || circDiagnostics(circuit()).size() != importedNotes.size())
         throw std::runtime_error("外部电路 diagnostics did not survive native reload");
     canvas->selected.clear();
     canvas->fit();
     canvas->exportPng(wxString((folder / "circ-import.png").wstring()));
     history.markSaved();
-    // Exercise actual canvas handlers as well as the persisted artwork model.
+    // 同时验证真实的画布事件处理器与持久化的外观模型。
     canvas->cancel();
     history.reset(Project{});
     current = "main";
@@ -2791,6 +3314,63 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     }
     propertySheet.ConvertToImage().SaveFile(wxString((folder / "property-table.png").wstring()),
                                             wxBITMAP_TYPE_PNG);
+    // 答辩重点回归：同一定义的两个嵌套实例拥有独立寄存器/RAM，导航不复位。
+    Project debugProject; debugProject.name="层次实例实时调试验收";debugProject.nextId=1000;
+    Circuit leaf; leaf.name="存储单元";
+    auto addPart=[](Circuit &target,const std::string &id,const std::string &kind,int width,Point at,uint32_t value=0) {
+        Part part;part.id=id;part.kind=kind;part.width=width;part.at=at;part.value=value;part.label=id;
+        target.parts.push_back(part);
+    };
+    auto connect=[](Circuit &target,const std::string &id,Endpoint a,Endpoint b) {target.wires.push_back({id,a,b,{}});};
+    addPart(leaf,"data","Input",8,{-330,-150});addPart(leaf,"clk","Input",1,{-330,-20});
+    addPart(leaf,"reg","Register",8,{0,-150});addPart(leaf,"q","Output",8,{330,-150});
+    addPart(leaf,"button","Button",1,{-200,250});addPart(leaf,"buttonOut","Output",1,{330,250});
+    addPart(leaf,"mem","RAM",8,{0,60});addPart(leaf,"addr","Constant",8,{-330,60});
+    addPart(leaf,"we","Constant",1,{-330,160},1);addPart(leaf,"ramq","Output",8,{330,60});
+    connect(leaf,"w1",{"data","Y"},{"reg","D"});connect(leaf,"w2",{"clk","Y"},{"reg","CLK"});
+    connect(leaf,"w3",{"reg","Q"},{"q","A"});connect(leaf,"w4",{"button","Y"},{"buttonOut","A"});
+    connect(leaf,"w5",{"data","Y"},{"mem","D"});connect(leaf,"w6",{"clk","Y"},{"mem","CLK"});
+    connect(leaf,"w7",{"addr","Y"},{"mem","ADDR"});connect(leaf,"w8",{"we","Y"},{"mem","WE"});
+    connect(leaf,"w9",{"mem","Q"},{"ramq","A"});
+    Circuit wrapper;wrapper.name="嵌套模块";
+    addPart(wrapper,"d","Input",8,{-240,-80});addPart(wrapper,"c","Input",1,{-240,80});
+    addPart(wrapper,"o","Output",8,{240,0});Part inner;inner.id="inner";inner.kind="Subcircuit";inner.circuit=leaf.name;
+    wrapper.parts.push_back(inner);connect(wrapper,"w10",{"d","Y"},{"inner","data"});
+    connect(wrapper,"w11",{"c","Y"},{"inner","clk"});connect(wrapper,"w12",{"inner","q"},{"o","A"});
+    auto &top=debugProject.circuits.front();
+    addPart(top,"leftData","Constant",8,{-320,-150},0x12);addPart(top,"rightData","Constant",8,{-320,150},0x34);
+    addPart(top,"clock","Clock",1,{-320,0});
+    for(auto entry:std::vector<std::pair<std::string,int>>{{"left",-150},{"right",150}}) {
+        Part debugInstance;debugInstance.id=entry.first;debugInstance.kind="Subcircuit";debugInstance.circuit=wrapper.name;debugInstance.at={0,double(entry.second)};
+        top.parts.push_back(debugInstance);connect(top,entry.first+"D",{entry.first+"Data","Y"},{entry.first,"d"});
+        connect(top,entry.first+"C",{"clock","Y"},{entry.first,"c"});
+    }
+    debugProject.circuits.push_back(wrapper);debugProject.circuits.push_back(leaf);debugProject.validate();
+    writeAtomic(std::filesystem::path(__FILE__).parent_path().parent_path()/"examples"/"defense-hierarchy.logic.json",serialize(debugProject));
+    history.reset(debugProject);current="main";canvas->selected.clear();rebuild(true,true);simulator->tick();rebuild(false);
+    auto originalSimulator=simulator.get();auto observedTime=simulator->time();auto observedTicks=simulator->ticks();
+    auto definitionBytes=serialize(history.project);timer.Start(60000);
+    enterInstance("left");enterInstance("inner");
+    if(simulator.get()!=originalSimulator||!timer.IsRunning()||simulator->time()!=observedTime||simulator->ticks()!=observedTicks||
+       read({"reg","Q"})!=Signal::number(0x12,8)||simulator->memory("left/inner/mem")[0]!=Signal::number(0x12,8))
+        throw std::runtime_error("live hierarchy navigation reset or lost the left instance state");
+    canvas->selected={"reg"};inspect();
+    stop();canvas->selected={"data"};inspect();
+    if(!properties->IsReadOnly(P_VALUE,1))throw std::runtime_error("nested interface Input is editable");
+    bool rejected=false;try{change([]{});}catch(const std::exception &){rejected=true;}
+    if(!rejected||serialize(history.project)!=definitionBytes)throw std::runtime_error("runtime structure edit was not rejected");
+    canvas->tool="Select";auto buttonAt=canvas->view.screen(circuit().part("button")->at);
+    wxMouseEvent buttonClick(wxEVT_LEFT_DCLICK);buttonClick.SetPosition({int(buttonAt.x),int(buttonAt.y)});canvas->doubleClick(buttonClick);
+    if(read({"button","Y"}).value!=1||simulator->read({"right/inner/button","Y"}).value!=0||serialize(history.project)!=definitionBytes)
+        throw std::runtime_error("instance button leaked into another instance or definition");
+    canvas->exportPng(wxString((folder/"hierarchy-left-instance.png").wstring()));
+    navigateTo(0);enterInstance("right");enterInstance("inner");
+    if(read({"reg","Q"})!=Signal::number(0x34,8)||simulator->memory("right/inner/mem")[0]!=Signal::number(0x34,8)||
+       simulator->ticks()!=observedTicks)throw std::runtime_error("right nested instance state was not isolated");
+    canvas->exportPng(wxString((folder/"hierarchy-right-instance.png").wstring()));
+    canvas->selected={"mem"};inspect();
+    navigateTo(0);canvas->fit();
+    writeAtomic(folder/"HIERARCHY-UI-PASS.txt","Live and paused navigation preserved simulator identity/time/ticks; nested instances kept independent registers/RAM; interface Input and structural edits read-only; internal button changed only its instance, without changing project definitions.\n");
     writeAtomic(folder / "EDITOR-UI-PASS.txt",
                 "Compact I/O, five state colours, table edits/validation/undo/live state, connection "
                 "warnings/errors/navigation passed.\n");

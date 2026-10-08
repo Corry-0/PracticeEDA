@@ -1,0 +1,1 @@
+Drawing, curve phases, handles, cancellation, layers, clipboard, undo and persistence passed.

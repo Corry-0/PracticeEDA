@@ -1,4 +1,4 @@
-// Feature regressions exercise public APIs, malformed files, live state and exported connectivity.
+// 特性回归测试：覆盖公共 API、畸形文件、实时状态与导出的连通性。
 #include "Digital.h"
 #include "json.hpp"
 #include <iostream>
@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
         rejects([&] { importComponent(full, bytes); }, "project capacity checked on import");
         check(serialize(full) == fullBefore, "capacity rejection preserves project");
 
-        // Nested interfaces refer to definition IDs. Verify import remaps them at every level.
+        // 嵌套接口引用定义 ID。验证导入时会在每一层都重映射它们。
         auto hierarchy = deserialize(
             readFile(std::filesystem::u8path(LOGIC_EXAMPLES_DIR) / "hierarchical-adder.logic.json"));
         Project target = halfAdder();
@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
               "custom project roundtrip");
         artifacts(Simulator(target, nested), dir, "hierarchy");
 
-        // Two imported register instances share the definition but never the running state.
+        // 两个导入的寄存器实例共享定义，但绝不共享运行状态。
         Project stateful;
         createComponent(stateful, "Latch8", {{"D", false, 8}, {"CLK", false, 1}, {"Q", true, 8}});
         auto reg = add(stateful, "Latch8", "Register", 8);
@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
         live.tick();
         check(live.read({o1, "A"}).value == 37 && live.read({o2, "A"}).value == 91,
               "instance state isolation");
-        live.setInput(d1, 5); // Keep pending events while exporting, to catch accidental settle/reset.
+        live.setInput(d1, 5); // 导出期间保留待处理事件，以捕获意外的 settle/reset。
         const auto time = live.time(), pending = live.pending(), traces = live.trace().size();
         const auto q1 = live.read({o1, "A"}), q2 = live.read({o2, "A"});
         const auto netlist = live.netlist();
@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
         check(netOf(j, s1 + ":" + pin(run, def, "Q")) == netOf(j, o1 + ":A"), "hierarchical output merged");
         check(netOf(j, o1 + ":A") != netOf(j, o2 + ":A"), "separate instance outputs remain distinct");
 
-        // Same-name junctions connect locally. Identical drawing positions alone do not connect.
+        // 同名节点只在本地连接；仅凭相同的绘图位置不会连接。
         Project labels;
         auto input = add(labels, "main", "Input", 32, UINT32_MAX), output = add(labels, "main", "Output", 32);
         auto isolated = add(labels, "main", "Output", 32);
@@ -204,7 +204,7 @@ int main(int argc, char **argv) {
               "export matches 32-bit simulation and floating input");
         check(j["nets"][netOf(j, input + ":Y") - 1]["labels"].size() == 2, "retain engineering net labels");
         artifacts(labeled, dir, "bus32-escaping");
-        // Import the labeled circuit, then instantiate it twice: BUS must stay local to each instance.
+        // 导入带标签的电路并实例化两次：BUS 必须保持在每个实例内部。
         Project scoped;
         auto scopedDef = importComponent(scoped, exportComponent(labels, "main"));
         auto left = add(scoped, "main", "Subcircuit", 1, 0, scopedDef);

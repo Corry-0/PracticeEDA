@@ -1,0 +1,10 @@
+{
+  "tool": "10.0.7",
+  "components": 9,
+  "nets": 6,
+  "connectedPads": 36,
+  "standardNetlistMatchesLoadedBoard": true,
+  "method": "KiCad loads paired native PCB, exports IPC-D-356; compare every assigned pad to standard .net",
+  "directNetlistGuiImportTested": false,
+  "routed": false
+}

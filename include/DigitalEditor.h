@@ -3,10 +3,11 @@
 #include "WxSupport.h"
 #include <wx/grid.h>
 #include <wx/treectrl.h>
+#include <fstream>
 
 namespace eda::logic {
 class LogicCanvas;
-// Owns the project/history and simulator; structural edits pass through change() for rollback.
+// 持有工程/历史记录与仿真器；所有结构修改都通过 change() 以支持失败回滚。
 class LogicEditor : public wxFrame {
   public:
     explicit LogicEditor(wxWindow *parent = nullptr);
@@ -18,6 +19,15 @@ class LogicEditor : public wxFrame {
   private:
     History history;
     std::string current = "main", savedPath;
+    // 电路定义、仿真根和观察实例必须分开；导航不得重建仿真器。
+    std::string simulationRoot = "main", scope;
+    struct Navigation { std::string circuit, scope; View view; };
+    std::vector<Navigation> navigation;
+    wxChoice *breadcrumbs;
+    wxTreeCtrl *hierarchy;
+    std::vector<std::string> recentFiles;
+    std::shared_ptr<std::ofstream> traceFile;
+    std::set<std::string> monitoredSignals;
     std::unique_ptr<Simulator> simulator;
     LogicCanvas *canvas;
     wxTreeCtrl *tree;
@@ -60,9 +70,24 @@ class LogicEditor : public wxFrame {
     void fail(const std::exception &);
     void stop();
     void setAppearance(bool enabled);
+    Signal read(const Endpoint &) const;
+    std::string scoped(const std::string &id) const;
+    void enterInstance(const std::string &id);
+    void navigateTo(size_t level);
+    void editDefinition();
+    void refreshHierarchy();
+    void memoryEditor(bool runtime);
+    void pinLayout();
+    void monitorSignals();
+    void writeTrace(const Trace &event);
+    void rememberFile(const std::string &path);
+    void recentMenu();
+    void exportBatch();
+    void printCircuit(bool preview);
+    void textDevice();
     friend class LogicCanvas;
 };
-// View coordinates and temporary gestures live here; committed data remains in the project model.
+// 视口坐标与临时手势状态都放在这里；已提交的数据始终保存在工程模型中。
 class LogicCanvas : public wxPanel {
   public:
     explicit LogicCanvas(LogicEditor *owner, wxWindow *parent);
@@ -73,7 +98,7 @@ class LogicCanvas : public wxPanel {
     void cancel();
     void fit();
     void render(wxGraphicsContext &, wxSize, bool clean = false);
-    void exportPng(const wxString &path);
+    void exportPng(const wxString &path, double scale = 1.5);
     void place(Point at);
     void route(Point at, bool freeEnd = false);
 
@@ -96,6 +121,8 @@ class LogicCanvas : public wxPanel {
     std::optional<Shape> draft;
     bool curveControl = false;
     int shapeHandle = -1;
+    std::string pressedButton;
+    std::string draggedInterface;
     void updateDraft(Point, bool constrain);
     void finishShape();
     std::optional<Endpoint> pinAt(Point at) const;

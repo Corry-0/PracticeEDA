@@ -1,0 +1,83 @@
+Start testing: Sep 24 16:42 中国标准时间
+----------------------------------------------------------
+1/5 Testing: digital_logic_tests
+1/5 Test: digital_logic_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/logic_tests.exe"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"digital_logic_tests" start time: Sep 24 16:42 中国标准时间
+Output:
+----------------------------------------------------------
+PASS 173 digital checks
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"digital_logic_tests" end time: Sep 24 16:42 中国标准时间
+"digital_logic_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/5 Testing: component_netlist_tests
+2/5 Test: component_netlist_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/component_netlist_tests.exe" "D:/zongshe/ElectronicComponent_Practice-/build/qa-features/Release"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"component_netlist_tests" start time: Sep 24 16:42 中国标准时间
+Output:
+----------------------------------------------------------
+PASS 135 feature checks
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"component_netlist_tests" end time: Sep 24 16:42 中国标准时间
+"component_netlist_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/5 Testing: circ_import_tests
+3/5 Test: circ_import_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/circ_import_tests.exe"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"circ_import_tests" start time: Sep 24 16:42 中国标准时间
+Output:
+----------------------------------------------------------
+澶栭儴鐢佃矾 import: 1067 checks passed
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"circ_import_tests" end time: Sep 24 16:42 中国标准时间
+"circ_import_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/5 Testing: shape_tests
+4/5 Test: shape_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/shape_tests.exe"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"shape_tests" start time: Sep 24 16:42 中国标准时间
+Output:
+----------------------------------------------------------
+Shapes: 28 checks passed
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"shape_tests" end time: Sep 24 16:42 中国标准时间
+"shape_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/5 Testing: netlist_format_tests
+5/5 Test: netlist_format_tests
+Command: "C:/Users/Chang/AppData/Local/Programs/Python/Python312/python.exe" "D:/zongshe/ElectronicComponent_Practice-/tests/verify_netlists.py" "D:/zongshe/ElectronicComponent_Practice-/build/qa-features/Release"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"netlist_format_tests" start time: Sep 24 16:42 中国标准时间
+Output:
+----------------------------------------------------------
+PASS 49 independently parsed netlist pairs
+<end of output>
+Test time =   0.08 sec
+----------------------------------------------------------
+Test Passed.
+"netlist_format_tests" end time: Sep 24 16:42 中国标准时间
+"netlist_format_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Sep 24 16:42 中国标准时间

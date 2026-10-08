@@ -1,0 +1,459 @@
+[
+  {
+    "circuit": "arithmetic-Add.circ",
+    "passed": true,
+    "expected": [
+      15
+    ],
+    "actual": [
+      15
+    ],
+    "exit": 0,
+    "stdout": "0000 1111\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "arithmetic-BitAdder.circ",
+    "passed": true,
+    "expected": [
+      2
+    ],
+    "actual": [
+      2
+    ],
+    "exit": 0,
+    "stdout": "0010\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "arithmetic-BitFinder.circ",
+    "passed": true,
+    "expected": [
+      2
+    ],
+    "actual": [
+      2
+    ],
+    "exit": 0,
+    "stdout": "010\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "arithmetic-Compare.circ",
+    "passed": true,
+    "expected": [
+      1
+    ],
+    "actual": [
+      1
+    ],
+    "exit": 0,
+    "stdout": "1\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "arithmetic-Divide.circ",
+    "passed": true,
+    "expected": [
+      4
+    ],
+    "actual": [
+      4
+    ],
+    "exit": 0,
+    "stdout": "0000 0100\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "arithmetic-Multiply.circ",
+    "passed": true,
+    "expected": [
+      36
+    ],
+    "actual": [
+      36
+    ],
+    "exit": 0,
+    "stdout": "0010 0100\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "arithmetic-Subtract.circ",
+    "passed": true,
+    "expected": [
+      9
+    ],
+    "actual": [
+      9
+    ],
+    "exit": 0,
+    "stdout": "0000 1001\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "counter-sequence.circ",
+    "passed": true,
+    "expected": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "actual": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "exit": 0,
+    "stdout": "0000\r\n0001\r\n0010\r\n0011\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "extra-BitSelector.circ",
+    "passed": true,
+    "expected": [
+      1
+    ],
+    "actual": [
+      1
+    ],
+    "exit": 0,
+    "stdout": "01\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "extra-ControlledInverter.circ",
+    "passed": true,
+    "expected": [
+      90
+    ],
+    "actual": [
+      90
+    ],
+    "exit": 0,
+    "stdout": "0101 1010\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "extra-EvenParity.circ",
+    "passed": true,
+    "expected": [
+      1
+    ],
+    "actual": [
+      1
+    ],
+    "exit": 0,
+    "stdout": "1\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "extra-OddParity.circ",
+    "passed": true,
+    "expected": [
+      0
+    ],
+    "actual": [
+      0
+    ],
+    "exit": 0,
+    "stdout": "0\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "extra-ShiftLeft.circ",
+    "passed": true,
+    "expected": [
+      148
+    ],
+    "actual": [
+      148
+    ],
+    "exit": 0,
+    "stdout": "1001 0100\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "extra-ShiftRight.circ",
+    "passed": true,
+    "expected": [
+      41
+    ],
+    "actual": [
+      41
+    ],
+    "exit": 0,
+    "stdout": "0010 1001\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "gate-rotation-0.circ",
+    "passed": true,
+    "expected": [
+      160
+    ],
+    "actual": [
+      160
+    ],
+    "exit": 0,
+    "stdout": "1010 0000\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "gate-rotation-1.circ",
+    "passed": true,
+    "expected": [
+      160
+    ],
+    "actual": [
+      160
+    ],
+    "exit": 0,
+    "stdout": "1010 0000\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "gate-rotation-2.circ",
+    "passed": true,
+    "expected": [
+      160
+    ],
+    "actual": [
+      160
+    ],
+    "exit": 0,
+    "stdout": "1010 0000\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "gate-rotation-3.circ",
+    "passed": true,
+    "expected": [
+      160
+    ],
+    "actual": [
+      160
+    ],
+    "exit": 0,
+    "stdout": "1010 0000\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "memory-RAM.circ",
+    "passed": true,
+    "expected": [
+      165
+    ],
+    "actual": [
+      165
+    ],
+    "exit": 0,
+    "stdout": "1010 0101\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "memory-ROM.circ",
+    "passed": true,
+    "expected": [
+      165
+    ],
+    "actual": [
+      165
+    ],
+    "exit": 0,
+    "stdout": "1010 0101\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "reverse-join.circ",
+    "passed": true,
+    "expected": [
+      165
+    ],
+    "actual": [
+      165
+    ],
+    "exit": 0,
+    "stdout": "1010 0101\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "reverse-split.circ",
+    "passed": true,
+    "expected": [
+      15
+    ],
+    "actual": [
+      15
+    ],
+    "exit": 0,
+    "stdout": "1111\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "select-Decoder.circ",
+    "passed": true,
+    "expected": [
+      1
+    ],
+    "actual": [
+      1
+    ],
+    "exit": 0,
+    "stdout": "1\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "select-Encoder.circ",
+    "passed": true,
+    "expected": [
+      5
+    ],
+    "actual": [
+      5
+    ],
+    "exit": 0,
+    "stdout": "101\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "select-Mux.circ",
+    "passed": true,
+    "expected": [
+      1
+    ],
+    "actual": [
+      1
+    ],
+    "exit": 0,
+    "stdout": "1\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "sequence-DFF.circ",
+    "passed": true,
+    "expected": [
+      0,
+      165
+    ],
+    "actual": [
+      0,
+      165
+    ],
+    "exit": 0,
+    "stdout": "0000 0000\r\n1010 0101\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "sequence-JKFF.circ",
+    "passed": true,
+    "expected": [
+      0,
+      1
+    ],
+    "actual": [
+      0,
+      1
+    ],
+    "exit": 0,
+    "stdout": "0\r\n1\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "sequence-RAM.circ",
+    "passed": true,
+    "expected": [
+      165,
+      90
+    ],
+    "actual": [
+      165,
+      90
+    ],
+    "exit": 0,
+    "stdout": "1010 0101\r\n0101 1010\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "sequence-Register.circ",
+    "passed": true,
+    "expected": [
+      0,
+      165
+    ],
+    "actual": [
+      0,
+      165
+    ],
+    "exit": 0,
+    "stdout": "0000 0000\r\n1010 0101\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "sequence-ShiftRegister.circ",
+    "passed": true,
+    "expected": [
+      0,
+      1,
+      3,
+      7
+    ],
+    "actual": [
+      0,
+      1,
+      3,
+      7
+    ],
+    "exit": 0,
+    "stdout": "0000\r\n0001\r\n0011\r\n0111\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "sequence-SRFF.circ",
+    "passed": true,
+    "expected": [
+      0,
+      1
+    ],
+    "actual": [
+      0,
+      1
+    ],
+    "exit": 0,
+    "stdout": "0\r\n1\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "sequence-TFF.circ",
+    "passed": true,
+    "expected": [
+      0,
+      1,
+      0,
+      1
+    ],
+    "actual": [
+      0,
+      1,
+      0,
+      1
+    ],
+    "exit": 0,
+    "stdout": "0\r\n1\r\n0\r\n1\r\n",
+    "stderr": ""
+  },
+  {
+    "circuit": "three-level-custom-interface.circ",
+    "passed": true,
+    "expected": [
+      90
+    ],
+    "actual": [
+      90
+    ],
+    "exit": 0,
+    "stdout": "0101 1010\r\n",
+    "stderr": ""
+  }
+]

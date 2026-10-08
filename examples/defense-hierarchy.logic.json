@@ -1,0 +1,535 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            -320.0,
+            -150.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "leftData",
+          "kind": "Constant",
+          "label": "leftData",
+          "params": {},
+          "rotation": 0,
+          "value": 18,
+          "width": 8
+        },
+        {
+          "at": [
+            -320.0,
+            150.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "rightData",
+          "kind": "Constant",
+          "label": "rightData",
+          "params": {},
+          "rotation": 0,
+          "value": 52,
+          "width": 8
+        },
+        {
+          "at": [
+            -320.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "clock",
+          "kind": "Clock",
+          "label": "clock",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            -150.0
+          ],
+          "bitGroups": [],
+          "circuit": "嵌套模块",
+          "data": [],
+          "id": "left",
+          "kind": "Subcircuit",
+          "label": "",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            150.0
+          ],
+          "bitGroups": [],
+          "circuit": "嵌套模块",
+          "data": [],
+          "id": "right",
+          "kind": "Subcircuit",
+          "label": "",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "leftData",
+            "Y"
+          ],
+          "b": [
+            "left",
+            "d"
+          ],
+          "bends": [],
+          "id": "leftD"
+        },
+        {
+          "a": [
+            "clock",
+            "Y"
+          ],
+          "b": [
+            "left",
+            "c"
+          ],
+          "bends": [],
+          "id": "leftC"
+        },
+        {
+          "a": [
+            "rightData",
+            "Y"
+          ],
+          "b": [
+            "right",
+            "d"
+          ],
+          "bends": [],
+          "id": "rightD"
+        },
+        {
+          "a": [
+            "clock",
+            "Y"
+          ],
+          "b": [
+            "right",
+            "c"
+          ],
+          "bends": [],
+          "id": "rightC"
+        }
+      ]
+    },
+    {
+      "interfaceLayout": {},
+      "name": "嵌套模块",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            -240.0,
+            -80.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "d",
+          "kind": "Input",
+          "label": "d",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 8
+        },
+        {
+          "at": [
+            -240.0,
+            80.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "c",
+          "kind": "Input",
+          "label": "c",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            240.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "o",
+          "kind": "Output",
+          "label": "o",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 8
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "存储单元",
+          "data": [],
+          "id": "inner",
+          "kind": "Subcircuit",
+          "label": "",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "d",
+            "Y"
+          ],
+          "b": [
+            "inner",
+            "data"
+          ],
+          "bends": [],
+          "id": "w10"
+        },
+        {
+          "a": [
+            "c",
+            "Y"
+          ],
+          "b": [
+            "inner",
+            "clk"
+          ],
+          "bends": [],
+          "id": "w11"
+        },
+        {
+          "a": [
+            "inner",
+            "q"
+          ],
+          "b": [
+            "o",
+            "A"
+          ],
+          "bends": [],
+          "id": "w12"
+        }
+      ]
+    },
+    {
+      "interfaceLayout": {},
+      "name": "存储单元",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            -330.0,
+            -150.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "data",
+          "kind": "Input",
+          "label": "data",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 8
+        },
+        {
+          "at": [
+            -330.0,
+            -20.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "clk",
+          "kind": "Input",
+          "label": "clk",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            -150.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "reg",
+          "kind": "Register",
+          "label": "reg",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 8
+        },
+        {
+          "at": [
+            330.0,
+            -150.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "q",
+          "kind": "Output",
+          "label": "q",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 8
+        },
+        {
+          "at": [
+            -200.0,
+            250.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "button",
+          "kind": "Button",
+          "label": "button",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            330.0,
+            250.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "buttonOut",
+          "kind": "Output",
+          "label": "buttonOut",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            60.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "mem",
+          "kind": "RAM",
+          "label": "mem",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 8
+        },
+        {
+          "at": [
+            -330.0,
+            60.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "addr",
+          "kind": "Constant",
+          "label": "addr",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 8
+        },
+        {
+          "at": [
+            -330.0,
+            160.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "we",
+          "kind": "Constant",
+          "label": "we",
+          "params": {},
+          "rotation": 0,
+          "value": 1,
+          "width": 1
+        },
+        {
+          "at": [
+            330.0,
+            60.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "ramq",
+          "kind": "Output",
+          "label": "ramq",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 8
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "data",
+            "Y"
+          ],
+          "b": [
+            "reg",
+            "D"
+          ],
+          "bends": [],
+          "id": "w1"
+        },
+        {
+          "a": [
+            "clk",
+            "Y"
+          ],
+          "b": [
+            "reg",
+            "CLK"
+          ],
+          "bends": [],
+          "id": "w2"
+        },
+        {
+          "a": [
+            "reg",
+            "Q"
+          ],
+          "b": [
+            "q",
+            "A"
+          ],
+          "bends": [],
+          "id": "w3"
+        },
+        {
+          "a": [
+            "button",
+            "Y"
+          ],
+          "b": [
+            "buttonOut",
+            "A"
+          ],
+          "bends": [],
+          "id": "w4"
+        },
+        {
+          "a": [
+            "data",
+            "Y"
+          ],
+          "b": [
+            "mem",
+            "D"
+          ],
+          "bends": [],
+          "id": "w5"
+        },
+        {
+          "a": [
+            "clk",
+            "Y"
+          ],
+          "b": [
+            "mem",
+            "CLK"
+          ],
+          "bends": [],
+          "id": "w6"
+        },
+        {
+          "a": [
+            "addr",
+            "Y"
+          ],
+          "b": [
+            "mem",
+            "ADDR"
+          ],
+          "bends": [],
+          "id": "w7"
+        },
+        {
+          "a": [
+            "we",
+            "Y"
+          ],
+          "b": [
+            "mem",
+            "WE"
+          ],
+          "bends": [],
+          "id": "w8"
+        },
+        {
+          "a": [
+            "mem",
+            "Q"
+          ],
+          "b": [
+            "ramq",
+            "A"
+          ],
+          "bends": [],
+          "id": "w9"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "层次实例实时调试验收",
+  "nextId": 1000,
+  "version": 1
+}

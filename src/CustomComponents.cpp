@@ -1,4 +1,4 @@
-// Portable component definitions reuse the validated project format and the existing subcircuit engine.
+// 可移植的元件定义复用已验证的工程格式与现有子电路引擎。
 #include "Digital.h"
 #include "json.hpp"
 
@@ -43,7 +43,7 @@ void createComponent(Project &project, const std::string &name, const std::vecto
 std::string exportComponent(const Project &project, const std::string &name) {
     project.validate();
     checkInterface(project.circuit(name));
-    // Include only reachable definitions. Unrelated work in the source project is never packaged.
+    // 只打包可达的定义；源工程中无关内容绝不会被打包。
     std::set<std::string> reachable;
     std::function<void(const std::string &)> visit = [&](const std::string &n) {
         if (!reachable.insert(n).second)
@@ -71,7 +71,7 @@ std::string importComponent(Project &project, const std::string &bytes) {
     if (j.at("format") != "PracticeEDA.component" || j.at("version") != 1)
         throw std::runtime_error("不是受支持的自定义元件文件（.component.json）");
     auto source = deserialize(j.at("project").dump());
-    // Repackage on import as well, to reject invalid interfaces and drop unrelated definitions.
+    // 导入时同样重新打包，以拒绝非法接口并丢弃无关定义。
     source = deserialize(json::parse(exportComponent(source, source.main)).at("project").dump());
     Project candidate = project;
     std::set<std::string> used;
@@ -91,7 +91,7 @@ std::string importComponent(Project &project, const std::string &bytes) {
         for (const auto &w : c.wires)
             ids[w.id] = candidate.id("w");
     }
-    // IDs are unique across a project. Remap both instance IDs and definition-based interface IDs.
+    // 工程内 ID 全局唯一。需要同时重映射实例 ID 与基于定义的接口 ID。
     for (auto c : source.circuits) {
         auto remapEndpoint = [&](Endpoint &e) {
             const auto *part = source.circuit(c.name).part(e.object);
@@ -114,6 +114,11 @@ std::string importComponent(Project &project, const std::string &bytes) {
         }
         for (auto &n : c.nodes)
             n.id = ids.at(n.id);
+        // 外观端子绑定内部 Input/Output ID；跨工程导入必须和电气端点一起重映射。
+        std::map<std::string, Point> layout;
+        for (const auto &entry : c.interfaceLayout)
+            layout.emplace(ids.at(entry.first), entry.second);
+        c.interfaceLayout = std::move(layout);
         candidate.circuits.push_back(std::move(c));
     }
     candidate.validate();

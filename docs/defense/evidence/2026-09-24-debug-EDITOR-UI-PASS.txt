@@ -1,0 +1,1 @@
+Compact I/O, five state colours, table edits/validation/undo/live state, connection warnings/errors/navigation passed.

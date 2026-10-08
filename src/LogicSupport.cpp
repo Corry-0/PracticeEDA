@@ -1,4 +1,4 @@
-// Shared geometry and bounded binary file I/O; no GUI or simulator dependencies.
+// 共享几何与受限的二进制文件读写；不依赖 GUI 或仿真器。
 #include "LogicSupport.h"
 #include <chrono>
 #include <fstream>
@@ -22,13 +22,13 @@ Point snap(Point p, double grid) {
     return {std::round(p.x / grid) * grid, std::round(p.y / grid) * grid};
 }
 void View::zoomAt(Point p, double z) {
-    // Keep the world point under the cursor fixed while changing scale.
+    // 缩放时保持光标下的世界坐标点不动。
     auto w = world(p);
     zoom = std::clamp(z, 0.1, 80.0);
     offset = p - w * zoom;
 }
 std::vector<Point> orthogonal(const std::vector<Point> &p) {
-    // Route corners are visual only; electrical joins always use explicit Endpoint objects.
+    // 拐角仅用于显示；电气连接始终使用显式的 Endpoint 对象。
     std::vector<Point> out;
     for (auto q : p) {
         if (!out.empty()) {

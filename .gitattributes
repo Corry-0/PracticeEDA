@@ -1,0 +1,4 @@
+# 保留外部工具原始证据的换行和固定列宽，行尾填充属于输出格式。
+docs/defense/evidence/*-ctest.log -text whitespace=-blank-at-eol
+docs/defense/sample/pcb/loaded.ipc -text whitespace=-blank-at-eol
+docs/defense/sample/pcb/kicad-loaded-board.svg -text whitespace=-blank-at-eol

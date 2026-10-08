@@ -116,7 +116,7 @@ void wiringAndPlexerTests() {
         std::string name;
         Point muxA, muxB, muxS, demuxA, demuxB, demuxS, decoder0, decoderStep;
     };
-    // Offsets from 外部电路 2.7's port definitions, not PracticeEDA symbol geometry.
+    // 偏移量来自 外部电路 2.7 的端口定义，而非 PracticeEDA 的符号几何。
     for (const auto &d : std::vector<Direction>{
              {"east", {-30, -10}, {-30, 10}, {-20, 20}, {30, -10}, {30, 10}, {20, 20}, {20, -40}, {0, 10}},
              {"west", {30, -10}, {30, 10}, {20, 20}, {-30, -10}, {-30, 10}, {-20, 20}, {-20, -40}, {0, 10}},
@@ -278,19 +278,30 @@ void partialAndValidationTests() {
     history.commit(before);
     check(history.undo() && serialize(history.project) == saved && history.redo(),
           "placeholder editing supports undo/redo");
+    // 新支持的变体应检查真正的模型属性，不能继续要求旧的“占位成功”。
+    auto multi = importCirc(project(comp("AND Gate", 0, 0, a("label", "multi"), 1)));
+    check(parameter(part(multi, "multi"), "inputs", 2) == 5 && circDiagnostics(multi.circuit("main")).size() == 1,
+          "default five-input gate maps with real inputs");
+    auto inverted = importCirc(project(comp("AND Gate", 0, 0, a("label", "inverted") + a("inputs", "2") + a("negate0", "true"), 1)));
+    check(parameter(part(inverted, "inverted"), "invertMask", 0) == 1, "input inversion preserved");
+    auto falling = importCirc(project(comp("Register", 0, 0, a("label", "falling") + a("trigger", "falling"), 4)));
+    check(parameter(part(falling, "falling"), "falling", 0) == 1, "falling trigger preserved");
+    auto clear = importCirc(project(comp("Register", 0, 0, a("label", "clear"), 4) + wire(-10, 20, 10, 20)));
+    check(part(clear, "clear").kind == "Register" && circDiagnostics(clear.circuit("main")).size() == 1,
+          "asynchronous clear is a supported actual input");
+    auto larger = importCirc(project(comp("ROM", 0, 0, a("label", "larger") + a("addrWidth", "16"), 4)));
+    check(parameter(part(larger, "larger"), "addressBits", 8) == 16, "16-bit memory address preserved");
+    auto mux4 = importCirc(project(comp("Multiplexer", 0, 0, a("label", "mux4") + a("select", "2"), 2)));
+    check(parameter(part(mux4, "mux4"), "selectBits", 1) == 2 && ports(mux4, part(mux4, "mux4")).size() == 6,
+          "four-way mux has all real data ports");
     for (auto body :
-         {comp("AND Gate", 0, 0, "", 1), comp("AND Gate", 0, 0, a("inputs", "2") + a("negate0", "true"), 1),
-          comp("Register", 0, 0, a("trigger", "falling"), 4),
-          comp("Register", 0, 0, "", 4) + wire(-10, 20, 10, 20),
-          comp("Register", 0, 0, "", 4) + comp("Constant", -30, 10), comp("RAM", 0, 0, "", 4),
-          comp("ROM", 0, 0, a("addrWidth", "16"), 4),
+         {comp("RAM", 0, 0, "", 4),
           comp("ROM", 0, 0, "<a name='contents'>addr/data: 8 8\n257*0</a>", 4),
-          comp("Multiplexer", 0, 0, a("select", "2"), 2),
           comp("Multiplexer", 0, 0, "", 2) + wire(-10, 20, 10, 20),
           comp("Constant", 0, 0, a("value", "garbage")), comp("Constant", 0, 0, a("width", "-1")),
           comp("Constant", 0, 0, a("futureBehavior", "1")), comp("Constant", 0, 0, "", 99)}) {
         auto q = importCirc(project(body));
-        check(circDiagnostics(q.circuit("main")).size() == 2, "unsupported variant diagnosed");
+        check(circDiagnostics(q.circuit("main")).size() == 2, "unsupported variant diagnosed: " + body);
     }
     auto labels = importCirc(project(comp("Pin", 0, 0, a("label", "重复&amp;标签")) +
                                             comp("Pin", 100, 0, a("label", "重复&amp;标签")),
@@ -298,8 +309,9 @@ void partialAndValidationTests() {
     labels.validate();
     check(labels.circuits.size() == 2 && circDiagnostics(labels.circuit("main")).size() == 2,
           "unicode/XML entities, duplicate pin labels, multiple circuits");
-    check(circDiagnostics(labels.circuit("child")).size() == 2,
-          "subcircuit instance is explicit placeholder");
+    check(circDiagnostics(labels.circuit("child")).size() == 1 &&
+              std::any_of(labels.circuit("child").parts.begin(), labels.circuit("child").parts.end(), [](const Part &p) { return p.kind == "Subcircuit" && p.circuit == "main"; }),
+          "subcircuit instance maps to actual definition");
     for (auto bad :
          {std::string("<project>"), project("") + "<extra/>",
           project("<comp name='Pin' lib='0' loc='(nan,1)'/>"), project("", "<circuit name='main'/>"),
@@ -315,8 +327,8 @@ void partialAndValidationTests() {
 }
 void exampleTest() {
     auto p = importCirc(readFile(std::filesystem::path(LOGIC_EXAMPLES_DIR) / "circ-limited.circ"));
-    check(circDiagnostics(p.circuit("main")).size() == 2,
-          "example has unsupported Adder and general note");
+    check(circDiagnostics(p.circuit("main")).size() == 1 && part(p, "未支持示例").kind == "Add",
+          "example Adder is now supported with real arithmetic behavior");
     Simulator s(p, "main");
     s.settle();
     s.setInput(part(p, "A").id, 1);

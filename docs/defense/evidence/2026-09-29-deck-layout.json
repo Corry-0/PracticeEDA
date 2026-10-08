@@ -1,0 +1,263 @@
+{
+  "sizes": [
+    {
+      "size": {
+        "width": 1600,
+        "height": 900
+      },
+      "slides": [
+        {
+          "page": 1,
+          "overflow": []
+        },
+        {
+          "page": 2,
+          "overflow": []
+        },
+        {
+          "page": 3,
+          "overflow": []
+        },
+        {
+          "page": 4,
+          "overflow": []
+        },
+        {
+          "page": 5,
+          "overflow": []
+        },
+        {
+          "page": 6,
+          "overflow": []
+        },
+        {
+          "page": 7,
+          "overflow": []
+        },
+        {
+          "page": 8,
+          "overflow": []
+        },
+        {
+          "page": 9,
+          "overflow": []
+        },
+        {
+          "page": 10,
+          "overflow": []
+        },
+        {
+          "page": 11,
+          "overflow": []
+        },
+        {
+          "page": 12,
+          "overflow": []
+        },
+        {
+          "page": 13,
+          "overflow": []
+        },
+        {
+          "page": 14,
+          "overflow": []
+        },
+        {
+          "page": 15,
+          "overflow": []
+        },
+        {
+          "page": 16,
+          "overflow": []
+        },
+        {
+          "page": 17,
+          "overflow": []
+        },
+        {
+          "page": 18,
+          "overflow": []
+        },
+        {
+          "page": 19,
+          "overflow": []
+        },
+        {
+          "page": 20,
+          "overflow": []
+        },
+        {
+          "page": 21,
+          "overflow": []
+        },
+        {
+          "page": 22,
+          "overflow": []
+        },
+        {
+          "page": 23,
+          "overflow": []
+        },
+        {
+          "page": 24,
+          "overflow": []
+        },
+        {
+          "page": 25,
+          "overflow": []
+        }
+      ]
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 720
+      },
+      "slides": [
+        {
+          "page": 1,
+          "overflow": []
+        },
+        {
+          "page": 2,
+          "overflow": []
+        },
+        {
+          "page": 3,
+          "overflow": []
+        },
+        {
+          "page": 4,
+          "overflow": []
+        },
+        {
+          "page": 5,
+          "overflow": []
+        },
+        {
+          "page": 6,
+          "overflow": []
+        },
+        {
+          "page": 7,
+          "overflow": []
+        },
+        {
+          "page": 8,
+          "overflow": []
+        },
+        {
+          "page": 9,
+          "overflow": []
+        },
+        {
+          "page": 10,
+          "overflow": []
+        },
+        {
+          "page": 11,
+          "overflow": []
+        },
+        {
+          "page": 12,
+          "overflow": []
+        },
+        {
+          "page": 13,
+          "overflow": []
+        },
+        {
+          "page": 14,
+          "overflow": []
+        },
+        {
+          "page": 15,
+          "overflow": []
+        },
+        {
+          "page": 16,
+          "overflow": []
+        },
+        {
+          "page": 17,
+          "overflow": []
+        },
+        {
+          "page": 18,
+          "overflow": []
+        },
+        {
+          "page": 19,
+          "overflow": []
+        },
+        {
+          "page": 20,
+          "overflow": []
+        },
+        {
+          "page": 21,
+          "overflow": []
+        },
+        {
+          "page": 22,
+          "overflow": []
+        },
+        {
+          "page": 23,
+          "overflow": []
+        },
+        {
+          "page": 24,
+          "overflow": []
+        },
+        {
+          "page": 25,
+          "overflow": []
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "networkRequests": [],
+  "presenterBefore": {
+    "mode": "presenter",
+    "idx": 13,
+    "session": "x59mwxrir6",
+    "syncState": "synced",
+    "timerRunning": false,
+    "rehearsalActive": false,
+    "presenterOverviewOn": false,
+    "autoEnabled": false,
+    "autoGlobalSeconds": 0,
+    "autoRemainingMs": 0,
+    "screenMode": "normal",
+    "annotationTool": "none",
+    "circles": [],
+    "audienceCircles": [],
+    "layoutMode": "balanced"
+  },
+  "syncedIndices": [
+    14,
+    14
+  ],
+  "notePersists": true,
+  "timer": "00:02",
+  "presenterGridCount": 25,
+  "presenterAfter": {
+    "mode": "presenter",
+    "idx": 14,
+    "session": "x59mwxrir6",
+    "syncState": "synced",
+    "timerRunning": false,
+    "rehearsalActive": false,
+    "presenterOverviewOn": false,
+    "autoEnabled": false,
+    "autoGlobalSeconds": 0,
+    "autoRemainingMs": 0,
+    "screenMode": "normal",
+    "annotationTool": "none",
+    "circles": [],
+    "audienceCircles": [],
+    "layoutMode": "balanced"
+  }
+}

@@ -8,7 +8,7 @@ std::pair<Point, Point> shapeBounds(const Shape &s) {
     Point lo{std::min(s.a.x, s.b.x), std::min(s.a.y, s.b.y)};
     Point hi{std::max(s.a.x, s.b.x), std::max(s.a.y, s.b.y)};
     if (s.kind == "Curve") {
-        // The control hull conservatively bounds the quadratic curve.
+        // 控制点包络是对二次曲线的保守包围。
         lo = {std::min(lo.x, s.control.x), std::min(lo.y, s.control.y)};
         hi = {std::max(hi.x, s.control.x), std::max(hi.y, s.control.y)};
     }
@@ -19,7 +19,7 @@ bool shapeHit(const Shape &s, Point p, double tolerance) {
     if (s.kind == "Line")
         return segmentDistance(p, s.a, s.b) <= tolerance;
     if (s.kind == "Curve") {
-        // Adaptive subdivision keeps hit testing accurate at every supported zoom level.
+        // 自适应细分使命中测试在各缩放级别下都足够精确。
         std::function<bool(Point, Point, Point, int)> hit = [&](Point a, Point c, Point b, int depth) {
             if (depth == 16 || segmentDistance(c, a, b) < tolerance / 4)
                 return segmentDistance(p, a, b) <= tolerance;

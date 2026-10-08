@@ -1,4 +1,4 @@
-// Compile the original image arrays into the executable; no resource files are needed at runtime.
+// 把原始图像数组编译进可执行文件；运行时不依赖任何资源文件。
 #include "LogicIcons.h"
 #include "WxSupport.h"
 #include "wxwidgets/copy_2x_png.c"

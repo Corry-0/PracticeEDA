@@ -1,9 +1,10 @@
-// Digital model, persistence and event simulation. Geometry never determines electrical connectivity.
+// 数字电路模型、持久化与事件驱动仿真。几何坐标绝不决定电气连接。
 #include "Digital.h"
 #include "json.hpp"
 #include <deque>
 #include <iomanip>
 #include <numeric>
+#include <limits>
 #include <sstream>
 #include <unordered_map>
 
@@ -23,10 +24,34 @@ uint64_t integer(const json &j, uint64_t maximum) {
 }
 bool sequential(const std::string &k) {
     return k == "DFF" || k == "TFF" || k == "JKFF" || k == "SRFF" || k == "Register" || k == "Counter" ||
-           k == "ShiftRegister" || k == "RAM" || k == "Clock";
+           k == "ShiftRegister" || k == "RAM" || k == "Clock" || k == "Random" || k == "Keyboard" ||
+           k == "TTY";
 }
 bool source(const std::string &k) {
-    return k == "Input" || k == "Button" || k == "Clock" || k == "Constant" || k == "Power" || k == "Ground";
+    return k == "Input" || k == "Button" || k == "Clock" || k == "Constant" || k == "Power" || k == "Ground" ||
+           k == "PullUp" || k == "PullDown";
+}
+std::string inputId(int i) {
+    // 前两脚保持旧工程 A/B；额外脚用 I2...，避免大选择器的 S/Y 与数据脚重名。
+    return i < 2 ? std::string(1, char('A' + i)) : "I" + std::to_string(i);
+}
+bool gate(const std::string &k) {
+    return k == "And" || k == "Nand" || k == "Or" || k == "Nor" || k == "Xor" || k == "Xnor";
+}
+bool switchKind(const std::string &k) { return k == "Transistor" || k == "TransmissionGate"; }
+int bitsFor(int maximum) {
+    int bits = 1;
+    while (bits < 31 && (uint64_t(1) << bits) <= uint64_t(maximum))
+        ++bits;
+    return bits;
+}
+std::vector<std::vector<int>> groups(const Part &p) {
+    if (!p.bitGroups.empty())
+        return p.bitGroups;
+    std::vector<std::vector<int>> result;
+    for (int i = 0; i < p.width; ++i)
+        result.push_back({i});
+    return result;
 }
 std::string portName(const Part &p) {
     return p.label.empty() ? p.id : p.label;
@@ -48,6 +73,11 @@ Endpoint endpointJson(const json &j) {
     return {j.at(0).get<std::string>(), j.at(1).get<std::string>()};
 }
 } // namespace
+int64_t parameter(const Part &p, const std::string &name, int64_t fallback) {
+    const auto it = p.params.find(name);
+    return it == p.params.end() ? fallback : it->second;
+}
+// 内置元件目录：kind 是持久化到工程文件的稳定标识，name 是显示名，category 是分类。
 const std::vector<PartInfo> &library() {
     static const std::vector<PartInfo> v = {{"Input", "输入引脚", "线路 (Wiring)"},
                                             {"Output", "输出引脚", "线路 (Wiring)"},
@@ -59,6 +89,10 @@ const std::vector<PartInfo> &library() {
                                             {"Joiner", "总线合并器", "线路 (Wiring)"},
                                             {"Extender", "位扩展器 (零扩展)", "线路 (Wiring)"},
                                             {"Probe", "探针", "线路 (Wiring)"},
+                                            {"PullUp", "弱上拉", "线路 (Wiring)"},
+                                            {"PullDown", "弱下拉", "线路 (Wiring)"},
+                                            {"Transistor", "晶体管开关", "线路 (Wiring)"},
+                                            {"TransmissionGate", "传输门", "线路 (Wiring)"},
                                             {"Not", "非门 NOT", "逻辑门 (Gates)"},
                                             {"Buffer", "缓冲器", "逻辑门 (Gates)"},
                                             {"And", "与门 AND", "逻辑门 (Gates)"},
@@ -68,6 +102,9 @@ const std::vector<PartInfo> &library() {
                                             {"Xor", "异或门 XOR", "逻辑门 (Gates)"},
                                             {"Xnor", "同或门 XNOR", "逻辑门 (Gates)"},
                                             {"TriState", "三态缓冲器", "逻辑门 (Gates)"},
+                                            {"ControlledInverter", "受控反相器", "逻辑门 (Gates)"},
+                                            {"EvenParity", "偶校验", "逻辑门 (Gates)"},
+                                            {"OddParity", "奇校验", "逻辑门 (Gates)"},
                                             {"Mux", "2:1 多路选择器", "复用器 (Plexers)"},
                                             {"Demux", "1:2 解复用器", "复用器 (Plexers)"},
                                             {"Decoder", "2:4 译码器", "复用器 (Plexers)"},
@@ -80,6 +117,9 @@ const std::vector<PartInfo> &library() {
                                             {"Compare", "比较器", "运算器 (Arithmetic)"},
                                             {"ShiftLeft", "逻辑左移", "运算器 (Arithmetic)"},
                                             {"ShiftRight", "逻辑右移", "运算器 (Arithmetic)"},
+                                            {"BitSelector", "位选择器", "复用器 (Plexers)"},
+                                            {"BitAdder", "位计数器", "运算器 (Arithmetic)"},
+                                            {"BitFinder", "位查找器", "运算器 (Arithmetic)"},
                                             {"DFF", "D 触发器", "存储 (Memory)"},
                                             {"TFF", "T 触发器", "存储 (Memory)"},
                                             {"JKFF", "JK 触发器", "存储 (Memory)"},
@@ -89,9 +129,15 @@ const std::vector<PartInfo> &library() {
                                             {"ShiftRegister", "移位寄存器", "存储 (Memory)"},
                                             {"RAM", "RAM (256 字)", "存储 (Memory)"},
                                             {"ROM", "ROM (256 字)", "存储 (Memory)"},
+                                            {"Random", "随机数发生器", "存储 (Memory)"},
                                             {"Button", "按钮 (双击切换)", "输入/输出 (Input/Output)"},
                                             {"LED", "LED", "输入/输出 (Input/Output)"},
                                             {"Hex", "十六进制显示", "输入/输出 (Input/Output)"},
+                                            {"Keyboard", "键盘", "输入/输出 (Input/Output)"},
+                                            {"TTY", "终端 TTY", "输入/输出 (Input/Output)"},
+                                            {"Joystick", "摇杆", "输入/输出 (Input/Output)"},
+                                            {"SevenSegment", "七段数码管（独立引脚）", "输入/输出 (Input/Output)"},
+                                            {"LEDMatrix", "LED 矩阵", "输入/输出 (Input/Output)"},
                                             {"Text", "文字标签", "基本 (Base)"}};
     return v;
 }
@@ -122,6 +168,9 @@ const Circuit &Project::circuit(const std::string &n) const {
             return c;
     throw std::runtime_error("子电路不存在：" + n);
 }
+// 返回某个元件的全部端口（名称/方向/位宽/坐标）。
+// 这是端口定义的唯一来源：绘图、命中测试、连线锚点、仿真建网全部复用它。
+// 子电路的端口来自其定义内部的 Input/Output 元件（递归读取定义）。
 std::vector<Port> ports(const Project &project, const Part &p) {
     std::vector<Port> v;
     auto in = [&](std::string n, int w = 0) { v.push_back({n, false, w ? w : p.width, {}}); };
@@ -141,40 +190,87 @@ std::vector<Port> ports(const Project &project, const Part &p) {
     else if (k == "Text") {
     } else if (k == "Splitter") {
         in("A");
-        for (int i = 0; i < p.width; ++i)
-            out("B" + std::to_string(i), 1);
+        const auto g = groups(p);
+        for (size_t i = 0; i < g.size(); ++i)
+            out("B" + std::to_string(i), int(g[i].size()));
     } else if (k == "Joiner") {
-        for (int i = 0; i < p.width; ++i)
-            in("B" + std::to_string(i), 1);
+        const auto g = groups(p);
+        for (size_t i = 0; i < g.size(); ++i)
+            in("B" + std::to_string(i), int(g[i].size()));
         out("Y");
     } else if (k == "Extender") {
-        in("A", 1);
+        in("A", int(parameter(p, "inputWidth", 1)));
         out("Y");
     } else if (k == "Mux") {
-        in("A");
-        in("B");
-        in("S", 1);
+        int bits = int(parameter(p, "selectBits", 1));
+        for (int i = 0; i < (1 << bits); ++i)
+            in(inputId(i));
+        in("S", bits);
         out("Y");
     } else if (k == "Demux") {
         in("A");
-        in("S", 1);
-        out("Y0");
-        out("Y1");
+        int bits = int(parameter(p, "selectBits", 1));
+        in("S", bits);
+        for (int i = 0; i < (1 << bits); ++i)
+            out("Y" + std::to_string(i));
     } else if (k == "Decoder") {
-        in("A", 2);
-        for (int i = 0; i < 4; ++i)
+        int bits = int(parameter(p, "selectBits", 2));
+        in("A", bits);
+        for (int i = 0; i < (1 << bits); ++i)
             out("Y" + std::to_string(i), 1);
     } else if (k == "Encoder") {
-        for (int i = 0; i < 4; ++i)
+        int bits = int(parameter(p, "selectBits", 2));
+        for (int i = 0; i < (1 << bits); ++i)
             in("A" + std::to_string(i), 1);
-        out("Y", 2);
+        out("Y", bits);
         out("V", 1);
-    } else if (k == "TriState") {
+    } else if (k == "TriState" || k == "ControlledInverter") {
         in("A");
         in("EN", 1);
         out("Y");
+    } else if (switchKind(k)) {
+        // A/B 均为无方向的电气端点；求值器动态联通网络，不产生伪造的单向驱动。
+        in("A");
+        in("B");
+        if (k == "Transistor")
+            in("G", 1);
+        else {
+            in("EN", 1);
+            in("NEN", 1);
+        }
+    } else if (k == "BitSelector") {
+        in("A");
+        // 选择的是“分组编号”，不是原总线位号；两位一组的8位总线只需2位选择。
+        int groupWidth = int(parameter(p,"outputWidth",1));
+        in("S", int(parameter(p, "selectBits", bitsFor((p.width+groupWidth-1)/groupWidth-1))));
+        out("Y", int(parameter(p, "outputWidth", 1)));
+    } else if (k == "BitAdder" || k == "BitFinder" || k == "EvenParity" || k == "OddParity") {
+        in("A");
+        out("Y", k == "BitAdder" ? bitsFor(p.width) : k == "BitFinder" ? bitsFor(p.width - 1) : 1);
+        if (k == "BitFinder")
+            out("V", 1);
+    } else if (k == "SevenSegment") {
+        for (const auto *pin : {"a", "b", "c", "d", "e", "f", "g", "dp"})
+            in(pin, 1);
+    } else if (k == "LEDMatrix") {
+        in("ROWS", int(parameter(p, "rows", 8)));
+        in("COLS", int(parameter(p, "cols", 8)));
+    } else if (k == "Joystick") {
+        out("X");
+        out("Y");
+    } else if (k == "Keyboard") {
+        in("CLK", 1);
+        in("READ", 1);
+        in("CLEAR", 1);
+        out("DATA", 8);
+        out("AVAILABLE", 1);
+    } else if (k == "TTY") {
+        in("DATA", 8);
+        in("CLK", 1);
+        in("EN", 1);
+        in("CLEAR", 1);
     } else if (k == "RAM" || k == "ROM") {
-        in("ADDR", 8);
+        in("ADDR", int(parameter(p, "addressBits", 8)));
         if (k == "RAM") {
             in("D");
             in("WE", 1);
@@ -196,14 +292,28 @@ std::vector<Port> ports(const Project &project, const Part &p) {
         }
         if (k == "Counter")
             in("EN", 1);
+        if (k == "Counter" && parameter(p, "loadable", 0)) {
+            in("D");
+            in("LOAD", 1);
+        }
+        if (k == "Random")
+            in("EN", 1);
         if (k == "ShiftRegister")
             in("D", 1);
         in("CLK", 1);
-        out("Q");
+        in("CLR", 1);          // 异步清零：高电平有效，与时钟无关
+        out(k == "Random" ? "Y" : "Q");
+        if (k == "Counter")
+            out("CARRY", 1);   // 终端计数输出（计到位宽最大值时为 1），用于级联
     } else {
-        in("A");
-        if (k != "Not" && k != "Buffer" && k != "Negate")
-            in("B");
+        if (gate(k)) {
+            for (int i = 0; i < int(parameter(p, "inputs", 2)); ++i)
+                in(inputId(i));
+        } else {
+            in("A");
+            if (k != "Not" && k != "Buffer" && k != "Negate")
+                in("B");
+        }
         if (k == "Compare") {
             out("LT", 1);
             out("EQ", 1);
@@ -218,9 +328,18 @@ std::vector<Port> ports(const Project &project, const Part &p) {
     for (auto &q : v)
         (q.output ? no : ni)++;
     int ii = 0, oi = 0;
-    for (auto &q : v)
+    for (auto &q : v) {
         q.at = {q.output ? 70.0 : -70.0,
                 20.0 * ((q.output ? oi++ : ii++) - ((q.output ? no : ni) - 1) * 0.5)};
+        if (p.kind == "Subcircuit") {
+            const auto &layout = project.circuit(p.circuit).interfaceLayout;
+            const auto it = layout.find(q.id);
+            if (it != layout.end())
+                q.at = it->second;
+        }
+        for (int turn = 0; turn < p.rotation; ++turn)
+            q.at = {-q.at.y, q.at.x};
+    }
     return v;
 }
 double partHeight(const Project &p, const Part &part) {
@@ -247,6 +366,8 @@ std::vector<Point> wirePoints(const Project &p, const Circuit &c, const Wire &w)
     return orthogonal(v);
 }
 void erase(Circuit &c, const std::set<std::string> &ids) {
+    for (const auto &id : ids)
+        c.interfaceLayout.erase(id);
     c.shapes.erase(
         std::remove_if(c.shapes.begin(), c.shapes.end(), [&](const Shape &s) { return ids.count(s.id); }),
         c.shapes.end());
@@ -262,8 +383,10 @@ void erase(Circuit &c, const std::set<std::string> &ids) {
                                  }),
                   c.wires.end());
 }
+// 加载/编译前统一校验整个工程：规模上限、ID 唯一且合法、位宽/坐标范围、
+// 子电路引用存在且无递归、输入/输出名称不重复等。
 void Project::validate() const {
-    // Validate all definitions, including unused ones, before loading or compiling a project.
+    // 在加载或编译工程前，校验所有定义（包括未被使用的定义）。
     if (circuits.empty() || circuits.size() > 128)
         throw std::runtime_error("电路数量应为 1–128");
     circuit(main);
@@ -315,15 +438,65 @@ void Project::validate() const {
                 throw std::runtime_error("位宽必须为 1–32");
             if (p.kind == "Clock" && p.width != 1)
                 throw std::runtime_error("时钟的位宽必须为 1");
+            if (p.rotation < 0 || p.rotation > 3)
+                throw std::runtime_error("元件方向必须为 0–3");
+            if (p.params.size() > 64)
+                throw std::runtime_error("元件参数过多");
+            const auto range = [&](const std::string &name, int64_t fallback, int64_t lo, int64_t hi) {
+                auto value = parameter(p, name, fallback);
+                if (value < lo || value > hi)
+                    throw std::runtime_error("元件参数 " + name + " 超出范围");
+            };
+            range("inputs", 2, 2, 32);
+            range("invertMask", 0, 0, UINT32_MAX);
+            range("selectBits", p.kind == "Decoder" || p.kind == "Encoder" ? 2 : 1, 1, 8);
+            range("inputWidth", 1, 1, 32);
+            range("outputWidth", 1, 1, 32);
+            range("addressBits", 8, 1, 16);
+            range("highTicks", 1, 1, 1000000);
+            range("lowTicks", 1, 1, 1000000);
+            range("phase", 0, 0, 1000000000);
+            range("counterMax", mask(p.width), 0, mask(p.width));
+            range("rows", 8, 1, 32);
+            range("cols", 8, 1, 32);
+            range("mode", 0, 0, 3);
+            range("seed", 1, 0, UINT32_MAX);
+            for (const auto *flag : {"signExtend", "falling", "loadable", "momentary", "activeLow", "xorOne",
+                                     "logisimCounter"})
+                range(flag, 0, 0, 1);
+            if (p.kind == "Extender" && parameter(p, "inputWidth", 1) > p.width)
+                throw std::runtime_error("位扩展器的输入位宽不能大于输出位宽");
+            if (p.kind == "Joystick" && p.width > 16)
+                throw std::runtime_error("摇杆每个坐标支持 1–16 位");
+            if (p.bitGroups.size() > 32)
+                throw std::runtime_error("总线分组最多 32 组");
+            std::set<int> assigned;
+            for (const auto &group : p.bitGroups) {
+                if (group.empty() || group.size() > 32)
+                    throw std::runtime_error("总线分组必须包含 1–32 个位号");
+                for (int bit : group) {
+                    if (bit < 0 || bit >= p.width)
+                        throw std::runtime_error("总线分组位号超出总线位宽");
+                    if (p.kind == "Joiner" && !assigned.insert(bit).second)
+                        throw std::runtime_error("合线器的同一个目标位不能被重复映射");
+                }
+            }
             if (p.kind != "Subcircuit" &&
                 std::none_of(library().begin(), library().end(), [&](auto &q) { return q.kind == p.kind; }))
                 throw std::runtime_error("不支持的元件：" + p.kind);
             if (p.kind == "Subcircuit")
                 circuit(p.circuit);
-            if (p.data.size() > 256)
-                throw std::runtime_error("存储器最多 256 字");
+            const size_t capacity = size_t(1) << int(parameter(p, "addressBits", 8));
+            if (p.data.size() > capacity)
+                throw std::runtime_error("存储器初值超出配置的地址容量");
             if ((p.kind == "Input" || p.kind == "Output") && !labels.insert(portName(p)).second)
                 throw std::runtime_error("输入输出名称不能重复");
+        }
+        for (const auto &entry : c.interfaceLayout) {
+            const auto *pin = c.part(entry.first);
+            if (!pin || (pin->kind != "Input" && pin->kind != "Output"))
+                throw std::runtime_error("外观引脚布局引用了不存在的输入/输出接口");
+            pos(entry.second);
         }
         for (auto &n : c.nodes) {
             idCheck(n.id);
@@ -357,6 +530,7 @@ void Project::validate() const {
     for (auto &c : circuits)
         visit(c.name);
 }
+// 把工程序列化为版本化的 .logic.json 文本（version=1）。
 std::string serialize(const Project &p) {
     json j = {{"format", "PracticeEDA.logic"},
               {"version", 1},
@@ -368,6 +542,9 @@ std::string serialize(const Project &p) {
         json q = {
             {"name", c.name}, {"parts", json::array()}, {"nodes", json::array()}, {"wires", json::array()}};
         q["shapes"] = json::array();
+        q["interfaceLayout"] = json::object();
+        for (const auto &entry : c.interfaceLayout)
+            q["interfaceLayout"][entry.first] = point(entry.second);
         for (const auto &s : c.shapes)
             q["shapes"].push_back({{"id", s.id},
                                    {"kind", s.kind},
@@ -385,7 +562,10 @@ std::string serialize(const Project &p) {
                                   {"at", point(a.at)},
                                   {"width", a.width},
                                   {"value", a.value},
-                                  {"data", a.data}});
+                                   {"data", a.data},
+                                   {"rotation", a.rotation},
+                                   {"params", a.params},
+                                   {"bitGroups", a.bitGroups}});
         for (auto &n : c.nodes)
             q["nodes"].push_back({{"id", n.id}, {"label", n.label}, {"at", point(n.at)}});
         for (auto &w : c.wires) {
@@ -399,6 +579,7 @@ std::string serialize(const Project &p) {
     }
     return j.dump(2);
 }
+// 从 JSON 文本反序列化工程，逐字段严格校验后调用 validate()。
 Project deserialize(const std::string &text) {
     if (text.size() > 32 * 1024 * 1024)
         throw std::runtime_error("工程文件超过 32 MB");
@@ -413,6 +594,12 @@ Project deserialize(const std::string &text) {
     for (auto &q : j.at("circuits")) {
         Circuit c;
         c.name = q.at("name");
+        if (q.contains("interfaceLayout")) {
+            if (!q.at("interfaceLayout").is_object())
+                throw std::runtime_error("外观引脚布局格式错误");
+            for (auto it = q.at("interfaceLayout").begin(); it != q.at("interfaceLayout").end(); ++it)
+                c.interfaceLayout[it.key()] = point(it.value());
+        }
         if (q.contains("shapes")) {
             if (!q.at("shapes").is_array())
                 throw std::runtime_error("图形列表格式错误");
@@ -438,6 +625,31 @@ Project deserialize(const std::string &text) {
             x.at = point(a.at("at"));
             x.width = int(integer(a.at("width"), 32));
             x.value = uint32_t(integer(a.at("value"), UINT32_MAX));
+            if (a.contains("rotation"))
+                x.rotation = int(integer(a.at("rotation"), 3));
+            if (a.contains("params")) {
+                if (!a.at("params").is_object() || a.at("params").size() > 64)
+                    throw std::runtime_error("元件参数格式错误");
+                for (auto it = a.at("params").begin(); it != a.at("params").end(); ++it) {
+                    if (!it.value().is_number_integer() ||
+                        (it.value().is_number_unsigned() && it.value().get<uint64_t>() > INT64_MAX))
+                        throw std::runtime_error("元件参数必须为有符号 64 位整数");
+                    x.params[it.key()] = it.value().get<int64_t>();
+                }
+            }
+            if (a.contains("bitGroups")) {
+                const auto &mapping = a.at("bitGroups");
+                if (!mapping.is_array() || mapping.size() > 32)
+                    throw std::runtime_error("总线分组格式错误");
+                for (const auto &group : mapping) {
+                    if (!group.is_array() || group.empty() || group.size() > 32)
+                        throw std::runtime_error("总线分组格式错误");
+                    std::vector<int> bits;
+                    for (const auto &bit : group)
+                        bits.push_back(int(integer(bit, 31)));
+                    x.bitGroups.push_back(std::move(bits));
+                }
+            }
             for (auto &word : a.at("data")) {
                 x.data.push_back(uint32_t(integer(word, UINT32_MAX)));
             }
@@ -486,10 +698,15 @@ Project halfAdder() {
     wire({g, "Y"}, {cy, "A"}, {});
     return p;
 }
+// 把选中的对象连同其依赖的子电路定义打包成一个小工程并序列化；
+// 这样跨工程粘贴时子电路依赖能一起携带，悬空端点转成自由节点。
 std::string copy(const Project &p, const Circuit &c, const std::set<std::string> &ids) {
     Project clip = p;
     Circuit dest;
     dest.name = c.name;
+    for (const auto &entry : c.interfaceLayout)
+        if (ids.count(entry.first))
+            dest.interfaceLayout.insert(entry);
     for (const auto &s : c.shapes)
         if (ids.count(s.id))
             dest.shapes.push_back(s);
@@ -519,8 +736,10 @@ std::string copy(const Project &p, const Circuit &c, const std::set<std::string>
     clip.main = c.name;
     return serialize(clip);
 }
+// 把剪贴板内容粘贴到目标电路：重新分配全部 ID、重名定义加后缀、
+// 重映射子电路接口 ID，并整体施加偏移。
 std::set<std::string> paste(Project &p, Circuit &target, const std::string &text, Point offset) {
-    // Definitions and interface IDs must move together when pasting across project boundaries.
+    // 跨工程粘贴时，定义与接口 ID 必须一起迁移。
     auto clip = deserialize(text);
     auto targetName = target.name;
     auto picked = clip.circuit(clip.main);
@@ -554,7 +773,11 @@ std::set<std::string> paste(Project &p, Circuit &target, const std::string &text
             if (q.kind == "Subcircuit")
                 q.circuit = import(q.circuit);
         }
-        // Port IDs are remapped below using the imported definition's original port order.
+        std::map<std::string, Point> layout;
+        for (const auto &entry : c.interfaceLayout)
+            layout[ids.at(entry.first)] = entry.second;
+        c.interfaceLayout = std::move(layout);
+        // 下面的端口 ID 使用导入定义的原始端口顺序进行重映射。
         for (size_t k = 0; k < c.parts.size(); ++k)
             if (c.parts[k].kind == "Subcircuit") {
                 const auto &oldPart = clip.circuit(name).parts[k];
@@ -618,6 +841,8 @@ std::set<std::string> paste(Project &p, Circuit &target, const std::string &text
         q.id = p.id("p");
         ids[old] = q.id;
         q.at = q.at + offset;
+        if (picked.interfaceLayout.count(old))
+            dest.interfaceLayout[q.id] = picked.interfaceLayout.at(old);
         if (q.kind == "Input" || q.kind == "Output")
             q.label = portName(q) + "_" + q.id;
         dest.parts.push_back(q);
@@ -649,6 +874,7 @@ std::set<std::string> paste(Project &p, Circuit &target, const std::string &text
     p.validate();
     return result;
 }
+// 撤销/重做采用“全工程快照 + 双栈”实现：past 最多 100 步，future 保存被撤销的状态。
 void History::reset(Project p, bool isSaved) {
     project = std::move(p);
     past.clear();
@@ -688,6 +914,8 @@ void History::markSaved() {
 bool History::dirty() const {
     return saved != serialize(project);
 }
+// 四态信号按位编码：value 保存 0/1，known 标记已知位，z 标记高阻位，error 标记冲突位。
+// 约定：1=高电平，0=低电平，X=未知，Z=高阻，E=冲突/非法运算。
 Signal Signal::number(uint32_t n, int w) {
     return {w, n & mask(w), mask(w), 0, 0};
 }
@@ -721,8 +949,10 @@ std::string Signal::text() const {
     }
     return s;
 }
+// 仿真器内部实现：把层次化电路展平成扁平实例（Node）与网络（NetState），
+// 用并查集合并显式端点与同名节点，再用按时间排序的事件队列驱动求值。
 struct Simulator::Impl {
-    // A Node is a flattened primitive instance; two instances never share register/RAM storage.
+    // Node 是展平后的原语实例；两个实例绝不共享寄存器/RAM 存储。
     struct Node {
         Part part;
         std::string path, object;
@@ -730,10 +960,14 @@ struct Simulator::Impl {
         std::map<std::string, Signal> outputs;
         Signal state = Signal::number(0, 1), previousClock = Signal::number(0, 1);
         std::vector<Signal> memory;
+        std::deque<uint8_t> keyboard;
+        std::string terminal;
+        uint32_t inputValue = 0, randomState = 1;
     };
     struct NetState {
         int width = 1;
         bool mismatch = false;
+        bool optionalOnly = true;  // 该网络只接到可悬空的控制引脚（CLR），未接线不算悬空
         Signal signal = Signal::floating(1);
         std::vector<std::pair<size_t, std::string>> drivers;
         std::set<size_t> users;
@@ -747,7 +981,10 @@ struct Simulator::Impl {
     std::vector<int> parent, widths;
     std::map<uint64_t, std::set<size_t>> queue;
     std::vector<Trace> traces;
+    std::function<void(const Trace &)> traceSink;
+    bool hasSwitches = false;
     uint64_t now = 0;
+    uint64_t ticks = 0;          // 累计时钟半周期数（tick() 被调用的次数）
     bool oscillating = false;
     std::set<std::string> oscillators;
     int key(const std::string &s, int w = 0) {
@@ -770,8 +1007,9 @@ struct Simulator::Impl {
         if (a != b)
             parent[b] = a;
     }
+    // 递归展平电路：为每个原语生成一个 Node，并把显式端点/同名节点并入同一网络。
     void flatten(const Circuit &c, const std::string &prefix, const std::string &top, bool nested) {
-        // Union explicit endpoints and same-name junctions within this instance only.
+        // 只在本实例内合并显式端点与同名的节点（label）。
         if (nodes.size() > 20000 || keys.size() > 250000)
             throw std::runtime_error("展开后的电路过大");
         std::map<std::string, int> labels;
@@ -838,26 +1076,39 @@ struct Simulator::Impl {
                 prev = std::max(prev, w);
                 n.width = prev;
             }
-            auto sep = k.first.find_first_of("/:");
+            auto sep = k.first.find(':');
             n.objects.insert(k.first.substr(0, sep));
         }
         for (size_t i = 0; i < nodes.size(); ++i) {
             auto &n = nodes[i];
+            hasSwitches = hasSwitches || switchKind(n.part.kind);
             for (auto &port : ports(project, n.part)) {
                 int net = roots.at(n.path + ":" + port.id);
                 n.nets[port.id] = net;
                 if (port.output)
                     nets[net].drivers.push_back({i, port.id});
-                else
+                else {
                     nets[net].users.insert(i);
+                    if (port.id != "CLR" && port.id != "CLEAR")
+                        nets[net].optionalOnly = false;
+                }
             }
         }
+        // 容量上限按展开后的实例求和，避免少量定义被大量实例化后耗尽内存。
+        size_t memoryWords = 0;
+        for (const auto &node : nodes)
+            if (node.part.kind == "RAM" || node.part.kind == "ROM") {
+                memoryWords += size_t(1) << int(parameter(node.part, "addressBits", 8));
+                if (memoryWords > 4194304)
+                    throw std::runtime_error("展开后的存储器总容量超过 4194304 字");
+            }
         reset();
     }
     void reset() {
         queue.clear();
         traces.clear();
         now = 0;
+        ticks = 0;
         oscillating = false;
         oscillators.clear();
         for (auto &net : nets)
@@ -865,11 +1116,23 @@ struct Simulator::Impl {
         for (size_t i = 0; i < nodes.size(); ++i) {
             auto &n = nodes[i];
             n.state = Signal::number(n.part.value, n.part.width);
+            n.inputValue = n.part.value;
+            n.randomState = uint32_t(parameter(n.part, "seed", n.part.value ? n.part.value : 1));
+            if (!n.randomState)
+                n.randomState = 1;
             n.previousClock = Signal::number(0, 1);
             n.outputs.clear();
-            n.memory.assign(256, Signal::number(0, n.part.width));
-            for (size_t j = 0; j < n.part.data.size(); ++j)
-                n.memory[j] = Signal::number(n.part.data[j], n.part.width);
+            n.keyboard.clear();
+            n.terminal.clear();
+            n.memory.clear();
+            if (n.part.kind == "RAM" || n.part.kind == "ROM") {
+                n.memory.assign(size_t(1) << int(parameter(n.part, "addressBits", 8)),
+                                Signal::number(0, n.part.width));
+                for (size_t j = 0; j < n.part.data.size(); ++j)
+                    n.memory[j] = Signal::number(n.part.data[j], n.part.width);
+            }
+            if (n.part.kind == "Clock")
+                n.state = Signal::number(clockValue(n, 0), 1);
             for (auto &port : ports(project, n.part))
                 if (port.output)
                     n.outputs[port.id] = Signal::floating(port.width);
@@ -877,6 +1140,27 @@ struct Simulator::Impl {
         }
     }
     Signal input(const Node &n, const std::string &pin) const { return nets.at(n.nets.at(pin)).signal; }
+    uint32_t clockValue(const Node &n, uint64_t tick) const {
+        uint64_t low = uint64_t(parameter(n.part, "lowTicks", 1));
+        uint64_t high = uint64_t(parameter(n.part, "highTicks", 1));
+        uint64_t phase = uint64_t(parameter(n.part, "phase", 0));
+        return ((tick + phase + (n.part.value & 1 ? low : 0)) % (low + high)) >= low;
+    }
+    bool edge(Node &n, Signal clk) {
+        const auto &old = n.previousClock;
+        const bool falling = parameter(n.part, "falling", 0) != 0;
+        bool result = old.defined() && clk.defined() &&
+                      (falling ? old.value && !clk.value : !old.value && clk.value);
+        n.previousClock = clk;
+        return result;
+    }
+    void record(Trace event) {
+        traces.push_back(event);
+        if (traceSink)
+            traceSink(event);
+    }
+    // 按元件 kind 求值：读取输入网络值，把结果写入 n.outputs。
+    // 组合门按位运算；时序元件只在明确的 0→1 上升沿采样。
     void evaluate(Node &n) {
         auto &k = n.part.kind;
         int w = n.part.width;
@@ -886,51 +1170,133 @@ struct Simulator::Impl {
             put(pin, Signal::number(value, width ? width : w));
         };
         if (source(k)) {
-            number("Y", k == "Power" ? mask(w) : k == "Ground" ? 0 : n.state.value);
+            number("Y", k == "Power" || k == "PullUp" ? mask(w)
+                        : k == "Ground" || k == "PullDown" ? 0
+                                                          : n.state.value);
             return;
         }
-        if (k == "Output" || k == "LED" || k == "Hex" || k == "Probe")
+        if (k == "Output" || k == "LED" || k == "Hex" || k == "Probe" || k == "SevenSegment" ||
+            k == "LEDMatrix" || switchKind(k))
             return;
+        if (k == "Joystick") {
+            number("X", n.inputValue & 0xffffU);
+            number("Y", n.inputValue >> 16);
+            return;
+        }
+        if (k == "Keyboard" || k == "TTY") {
+            bool trigger = edge(n, a("CLK"));
+            auto clear = a("CLEAR");
+            if (clear.defined() && clear.value) {
+                n.keyboard.clear();
+                n.terminal.clear();
+            } else if (trigger) {
+                auto enable = a(k == "Keyboard" ? "READ" : "EN");
+                if (enable.defined() && enable.value) {
+                    if (k == "Keyboard") {
+                        if (!n.keyboard.empty())
+                            n.keyboard.pop_front();
+                    } else {
+                        auto data = a("DATA");
+                        if (data.defined()) {
+                            char ch = char(data.value & 255);
+                            if (ch == '\b') {
+                                if (!n.terminal.empty())
+                                    n.terminal.pop_back();
+                            } else if (ch == '\f')
+                                n.terminal.clear();
+                            else if (ch != '\0' && n.terminal.size() < 1048576)
+                                n.terminal += ch;
+                        }
+                    }
+                }
+            }
+            if (k == "Keyboard") {
+                number("DATA", n.keyboard.empty() ? 0 : n.keyboard.front(), 8);
+                number("AVAILABLE", !n.keyboard.empty(), 1);
+            }
+            return;
+        }
         if (k == "Splitter") {
             auto s = a("A");
-            for (int i = 0; i < w; ++i)
-                put("B" + std::to_string(i),
-                    {1, (s.value >> i) & 1, (s.known >> i) & 1, (s.z >> i) & 1, (s.error >> i) & 1});
+            const auto g = groups(n.part);
+            for (size_t i = 0; i < g.size(); ++i) {
+                Signal result = Signal::unknown(int(g[i].size()));
+                for (size_t j = 0; j < g[i].size(); ++j) {
+                    auto from = unsigned(g[i][j]);
+                    result.value |= ((s.value >> from) & 1U) << j;
+                    result.known |= ((s.known >> from) & 1U) << j;
+                    result.z |= ((s.z >> from) & 1U) << j;
+                    result.error |= ((s.error >> from) & 1U) << j;
+                }
+                put("B" + std::to_string(i), result);
+            }
             return;
         }
         if (k == "Joiner") {
-            Signal s = Signal::unknown(w);
-            for (int i = 0; i < w; ++i) {
+            Signal s = Signal::number(0, w);
+            const auto g = groups(n.part);
+            for (size_t i = 0; i < g.size(); ++i) {
                 auto b = a("B" + std::to_string(i));
-                s.value |= (b.value & 1) << i;
-                s.known |= (b.known & 1) << i;
-                s.z |= (b.z & 1) << i;
-                s.error |= (b.error & 1) << i;
+                for (size_t j = 0; j < g[i].size(); ++j) {
+                    uint32_t target = uint32_t(1) << g[i][j];
+                    s.known &= ~target;
+                    s.value |= ((b.value >> j) & 1U) << g[i][j];
+                    s.known |= ((b.known >> j) & 1U) << g[i][j];
+                    s.z |= ((b.z >> j) & 1U) << g[i][j];
+                    s.error |= ((b.error >> j) & 1U) << g[i][j];
+                }
             }
             put("Y", s);
             return;
         }
         if (k == "Extender") {
             auto s = a("A");
+            int oldWidth = s.width;
             s.width = w;
-            s.known |= mask(w) & ~1U;
+            uint32_t added = mask(w) & ~mask(oldWidth);
+            if (parameter(n.part, "signExtend", 0)) {
+                uint32_t sign = uint32_t(1) << (oldWidth - 1);
+                if (s.value & sign)
+                    s.value |= added;
+                if (s.known & sign)
+                    s.known |= added;
+                if (s.z & sign)
+                    s.z |= added;
+                if (s.error & sign)
+                    s.error |= added;
+            } else
+                s.known |= added;
             put("Y", s);
             return;
         }
-        if (k == "TriState") {
+        if (k == "TriState" || k == "ControlledInverter") {
             auto en = a("EN");
-            put("Y", en.defined() ? (en.value ? a("A") : Signal::floating(w)) : Signal::unknown(w));
+            auto value = a("A");
+            if (k == "ControlledInverter") {
+                value.value = (~value.value) & value.known;
+                value.z = 0;
+            }
+            bool enabled = bool(en.value) != bool(parameter(n.part, "activeLow", 0));
+            put("Y", en.defined() ? (enabled ? value : Signal::floating(w)) : Signal::unknown(w));
             return;
         }
         if (k == "Mux") {
             auto s = a("S");
-            auto x = a("A"), y = a("B");
-            put("Y", s.defined() ? (s.value ? y : x) : (x == y ? x : Signal::unknown(w)));
+            auto result = a("A");
+            if (s.defined())
+                result = a(inputId(int(s.value)));
+            else
+                for (int i = 1; i < (1 << int(parameter(n.part, "selectBits", 1))); ++i)
+                    if (a(inputId(i)) != result) {
+                        result = Signal::unknown(w);
+                        break;
+                    }
+            put("Y", result);
             return;
         }
         if (k == "Demux") {
             auto s = a("S");
-            for (int i = 0; i < 2; ++i)
+            for (int i = 0; i < (1 << int(parameter(n.part, "selectBits", 1))); ++i)
                 put("Y" + std::to_string(i), !s.defined()             ? Signal::unknown(w)
                                              : s.value == uint32_t(i) ? a("A")
                                                                       : Signal::number(0, w));
@@ -938,7 +1304,7 @@ struct Simulator::Impl {
         }
         if (k == "Decoder") {
             auto s = a("A");
-            for (int i = 0; i < 4; ++i)
+            for (int i = 0; i < (1 << int(parameter(n.part, "selectBits", 2))); ++i)
                 put("Y" + std::to_string(i),
                     s.defined() ? Signal::number(s.value == uint32_t(i), 1) : Signal::unknown(1));
             return;
@@ -946,7 +1312,8 @@ struct Simulator::Impl {
         if (k == "Encoder") {
             int value = 0;
             bool valid = false, known = true;
-            for (int i = 0; i < 4; ++i) {
+            int bits = int(parameter(n.part, "selectBits", 2));
+            for (int i = 0; i < (1 << bits); ++i) {
                 auto s = a("A" + std::to_string(i));
                 if (!s.defined())
                     known = false;
@@ -955,18 +1322,63 @@ struct Simulator::Impl {
                     valid = true;
                 }
             }
-            put("Y", known ? Signal::number(value, 2) : Signal::unknown(2));
+            put("Y", known ? Signal::number(value, bits) : Signal::unknown(bits));
             put("V", known ? Signal::number(valid, 1) : Signal::unknown(1));
+            return;
+        }
+        if (k == "BitSelector" || k == "BitAdder" || k == "BitFinder" || k == "EvenParity" ||
+            k == "OddParity") {
+            auto value = a("A");
+            int outputWidth = n.outputs.at("Y").width;
+            if (k == "BitSelector") {
+                auto select = a("S");
+                Signal result = Signal::unknown(outputWidth);
+                if (select.defined()) {
+                    uint64_t shift = uint64_t(select.value) * uint64_t(outputWidth);
+                    result = Signal::number(0, outputWidth);
+                    if (shift < uint64_t(w)) {
+                        uint32_t covered = mask(std::min(outputWidth, w - int(shift)));
+                        result.value = (value.value >> shift) & covered;
+                        result.known = ((value.known >> shift) & covered) | (mask(outputWidth) & ~covered);
+                        result.z = (value.z >> shift) & covered;
+                        result.error = (value.error >> shift) & covered;
+                    }
+                }
+                put("Y", result);
+            } else if (!value.defined()) {
+                put("Y", Signal::unknown(outputWidth));
+                if (k == "BitFinder")
+                    put("V", Signal::unknown(1));
+            } else if (k == "BitFinder") {
+                int mode = int(parameter(n.part, "mode", 0));
+                uint32_t candidates = (mode >= 2 ? ~value.value : value.value) & mask(w);
+                int found = -1;
+                for (int i = 0; i < w; ++i) {
+                    int bit = mode & 1 ? w - 1 - i : i;
+                    if ((candidates >> bit) & 1U) {
+                        found = bit;
+                        break;
+                    }
+                }
+                number("Y", found < 0 ? 0 : uint32_t(found), outputWidth);
+                number("V", found >= 0, 1);
+            } else {
+                uint32_t bits = value.value;
+                unsigned count = 0;
+                while (bits) {
+                    bits &= bits - 1;
+                    ++count;
+                }
+                number("Y", k == "BitAdder" ? count : k == "OddParity" ? count % 2 : !(count % 2),
+                       outputWidth);
+            }
             return;
         }
         if (k == "ROM" || k == "RAM") {
             auto addr = a("ADDR");
             if (k == "RAM") {
                 auto clk = a("CLK");
-                bool rising =
-                    n.previousClock.defined() && !n.previousClock.value && clk.defined() && clk.value;
-                n.previousClock = clk;
-                if (rising) {
+                if (edge(n, clk)) {
                     auto we = a("WE");
                     if (addr.defined()) {
                         if (we.defined() && we.value)
@@ -982,18 +1394,55 @@ struct Simulator::Impl {
         }
         if (sequential(k)) {
             auto clk = a("CLK");
-            bool rising = n.previousClock.defined() && !n.previousClock.value && clk.defined() && clk.value;
-            n.previousClock = clk;
-            if (rising) {
+            bool trigger = edge(n, clk); // 清零期间也记录时钟历史，避免解除清零后出现虚假边沿。
+            auto clr = a("CLR");
+            if (clr.defined() && clr.value) {
+                n.state = Signal::number(0, w);  // 异步清零：与时钟无关，优先级高于时钟沿
+                if (k == "Random") {
+                    n.randomState = uint32_t(parameter(n.part, "seed", n.part.value ? n.part.value : 1));
+                    if (!n.randomState)
+                        n.randomState = 1;
+                }
+            } else if (trigger) {
                 if (k == "DFF" || k == "Register") {
                     n.state = a("D");
                     n.state.z = 0;
                 } else if (k == "Counter") {
                     auto en = a("EN");
-                    if (!en.defined())
+                    Signal load = parameter(n.part, "loadable", 0) ? a("LOAD") : Signal::number(0, 1);
+                    const bool external = parameter(n.part, "logisimCounter", 0) != 0;
+                    // 经典 Logisim 的 CT/LD 组合同时表示计数方向和装载；原生 LOAD 则优先装载。
+                    // 导入器显式打标后才切换语义，避免已有原生工程悄悄改变行为。
+                    if (external && (!load.defined() || !en.defined()))
+                        n.state = Signal::unknown(w);
+                    else if (external && en.value && load.value)
+                        n.state = n.state.defined()
+                                      ? Signal::number(n.state.value == 0
+                                                           ? uint32_t(parameter(n.part, "counterMax", mask(w)))
+                                                           : n.state.value - 1,
+                                                       w)
+                                      : Signal::unknown(w);
+                    else if (load.defined() && load.value) {
+                        n.state = a("D");
+                        n.state.z = 0;
+                    } else if (!load.defined() || !en.defined())
                         n.state = Signal::unknown(w);
                     else if (en.value && n.state.defined())
-                        n.state = Signal::number(n.state.value + 1, w);
+                        n.state = Signal::number(n.state.value >= uint32_t(parameter(n.part, "counterMax", mask(w)))
+                                                     ? 0
+                                                     : n.state.value + 1,
+                                                 w);
+                } else if (k == "Random") {
+                    auto en = a("EN");
+                    if (!en.defined())
+                        n.state = Signal::unknown(w);
+                    else if (en.value) {
+                        // 固定种子的 xorshift32 便于课程演示重放，实例之间不共享随机状态。
+                        n.randomState ^= n.randomState << 13;
+                        n.randomState ^= n.randomState >> 17;
+                        n.randomState ^= n.randomState << 5;
+                        n.state = Signal::number(n.randomState, w);
+                    }
                 } else if (k == "ShiftRegister") {
                     auto d = a("D");
                     n.state = {w, ((n.state.value << 1) | (d.value & 1)) & mask(w),
@@ -1025,7 +1474,19 @@ struct Simulator::Impl {
                     n.state = next;
                 }
             }
-            put("Q", n.state);
+            put(k == "Random" ? "Y" : "Q", n.state);
+            if (k == "Counter") {
+                uint32_t terminal = uint32_t(parameter(n.part, "counterMax", mask(w)));
+                bool cleared = false;
+                if (parameter(n.part, "logisimCounter", 0)) {
+                    const auto enable = a("EN");
+                    const auto load = parameter(n.part, "loadable", 0) ? a("LOAD") : Signal::number(0, 1);
+                    if (enable.defined() && enable.value && load.defined() && load.value)
+                        terminal = 0;
+                    cleared = clr.defined() && clr.value;
+                }
+                put("CARRY", Signal::number(!cleared && n.state.defined() && n.state.value == terminal, 1));
+            }
             return;
         }
         auto x = a("A");
@@ -1041,27 +1502,60 @@ struct Simulator::Impl {
             put("Y", x.defined() ? Signal::number(0U - x.value, w) : Signal::unknown(w));
             return;
         }
-        auto y = a("B");
-        if (k == "And" || k == "Nand" || k == "Or" || k == "Nor" || k == "Xor" || k == "Xnor") {
-            Signal s = Signal::unknown(w);
-            if (k == "And" || k == "Nand") {
-                auto zero = (x.known & ~x.value) | (y.known & ~y.value);
-                s.known = (x.known & y.known) | zero;
-                s.value = x.value & y.value & s.known;
-            } else if (k == "Or" || k == "Nor") {
-                auto one = (x.known & x.value) | (y.known & y.value);
-                s.known = (x.known & y.known) | one;
-                s.value = (x.value | y.value) & s.known;
-            } else {
-                s.known = x.known & y.known;
-                s.value = (x.value ^ y.value) & s.known;
+        if (gate(k)) {
+            bool andGate = k == "And" || k == "Nand", orGate = k == "Or" || k == "Nor";
+            Signal s = Signal::number(andGate ? mask(w) : 0, w);
+            std::vector<Signal> values;
+            uint32_t inversions = uint32_t(parameter(n.part, "invertMask", 0));
+            int count = int(parameter(n.part, "inputs", 2));
+            for (int i = 0; i < count; ++i) {
+                auto value = a(inputId(i));
+                if ((inversions >> i) & 1U) {
+                    value.value = (~value.value) & value.known;
+                    value.z = 0;
+                }
+                values.push_back(value);
+                Signal next = Signal::unknown(w);
+                if (andGate) {
+                    uint32_t zero = (s.known & ~s.value) | (value.known & ~value.value);
+                    next.known = (s.known & value.known) | zero;
+                    next.value = s.value & value.value & next.known;
+                } else if (orGate) {
+                    uint32_t one = (s.known & s.value) | (value.known & value.value);
+                    next.known = (s.known & value.known) | one;
+                    next.value = (s.value | value.value) & next.known;
+                } else {
+                    next.known = s.known & value.known;
+                    next.value = (s.value ^ value.value) & next.known;
+                }
+                next.error = (s.error | value.error) & ~next.known;
+                s = next;
             }
-            s.error = (x.error | y.error) & ~s.known;
+            if (!andGate && !orGate && parameter(n.part, "xorOne", 0)) {
+                s = Signal::unknown(w);
+                for (int bit = 0; bit < w; ++bit) {
+                    uint32_t b = uint32_t(1) << bit;
+                    int ones = 0, unknown = 0;
+                    bool error = false;
+                    for (const auto &value : values) {
+                        ones += (value.known & value.value & b) != 0;
+                        unknown += (value.known & b) == 0;
+                        error = error || (value.error & b);
+                    }
+                    if (ones >= 2 || !unknown) {
+                        s.known |= b;
+                        if (ones == 1)
+                            s.value |= b;
+                    } else if (error)
+                        s.error |= b;
+                }
+            }
             if (k == "Nand" || k == "Nor" || k == "Xnor")
                 s.value = (~s.value) & s.known;
             put("Y", s);
             return;
         }
+        auto y = a("B");
         if (!x.defined() || !y.defined()) {
             for (auto &out : n.outputs)
                 out.second = Signal::unknown(out.second.width);
@@ -1087,6 +1581,8 @@ struct Simulator::Impl {
         else if (k == "ShiftRight")
             number("Y", y.value >= 32 ? 0 : x.value >> y.value);
     }
+    // 逐位合并同一网络上的多个驱动：
+    // 无驱动→Z；单一确定驱动→0/1；多个不同确定驱动或 error→E。
     Signal resolve(const NetState &net) {
         if (net.mismatch)
             return Signal::failure(net.width);
@@ -1094,7 +1590,17 @@ struct Simulator::Impl {
         for (int bit = 0; bit < net.width; ++bit) {
             uint32_t b = uint32_t(1) << bit;
             bool zero = false, one = false, unknown = false, error = false;
+            bool strong = false;
+            for (const auto &d : net.drivers) {
+                const auto &node = nodes[d.first];
+                const auto &s = node.outputs.at(d.second);
+                if (node.part.kind != "PullUp" && node.part.kind != "PullDown" && !(s.z & b))
+                    strong = true;
+            }
             for (auto &d : net.drivers) {
+                const auto &kind = nodes[d.first].part.kind;
+                if (strong && (kind == "PullUp" || kind == "PullDown"))
+                    continue;
                 auto s = nodes[d.first].outputs.at(d.second);
                 if (s.error & b)
                     error = true;
@@ -1118,9 +1624,98 @@ struct Simulator::Impl {
         }
         return result;
     }
+    std::vector<Signal> switchedSignals() {
+        // 开关不是驱动器。每批事件根据控制端临时联通 A/B，合并两边的真实驱动后再解析。
+        // 静态连线的 roots 保持不变，因此关断可恢复两个独立网络，且观察路径不会漂移。
+        std::vector<int> connected(nets.size());
+        std::iota(connected.begin(), connected.end(), 0);
+        std::function<int(int)> rootOf = [&](int i) {
+            return connected[i] == i ? i : connected[i] = rootOf(connected[i]);
+        };
+        auto connect = [&](int a, int b) {
+            a = rootOf(a);
+            b = rootOf(b);
+            if (a != b)
+                connected[b] = a;
+        };
+        std::vector<std::pair<int, int>> uncertain;
+        for (const auto &node : nodes) {
+            if (!switchKind(node.part.kind))
+                continue;
+            int state = 0; // 0 断开，1 导通，-1 控制未知（保守解析所有可能的连通结果）。
+            if (node.part.kind == "Transistor") {
+                auto control = input(node, "G");
+                state = control.defined()
+                            ? int(bool(control.value) != bool(parameter(node.part, "activeLow", 0)))
+                            : -1;
+            } else {
+                auto enable = input(node, "EN"), complement = input(node, "NEN");
+                if ((enable.defined() && !enable.value) || (complement.defined() && complement.value))
+                    state = 0;
+                else if (enable.defined() && complement.defined())
+                    state = 1;
+                else
+                    state = -1;
+            }
+            int a = node.nets.at("A"), b = node.nets.at("B");
+            if (state > 0)
+                connect(a, b);
+            else if (state < 0)
+                uncertain.push_back({a, b});
+        }
+        auto collect = [&]() {
+            std::map<int, NetState> merged;
+            for (size_t i = 0; i < nets.size(); ++i) {
+                auto id = rootOf(int(i));
+                auto found = merged.find(id);
+                if (found == merged.end()) {
+                    NetState group;
+                    group.width = nets[i].width;
+                    group.mismatch = nets[i].mismatch;
+                    merged.emplace(id, std::move(group));
+                }
+                auto &group = merged.at(id);
+                group.mismatch = group.mismatch || nets[i].mismatch || group.width != nets[i].width;
+                group.width = std::max(group.width, nets[i].width);
+                group.drivers.insert(group.drivers.end(), nets[i].drivers.begin(), nets[i].drivers.end());
+            }
+            std::map<int, Signal> values;
+            for (const auto &entry : merged)
+                values[entry.first] = resolve(entry.second);
+            std::vector<Signal> result;
+            result.reserve(nets.size());
+            for (size_t i = 0; i < nets.size(); ++i) {
+                auto s = values.at(rootOf(int(i)));
+                s.width = nets[i].width;
+                uint32_t keep = mask(s.width);
+                s.value &= keep;
+                s.known &= keep;
+                s.z &= keep;
+                s.error &= keep;
+                result.push_back(s);
+            }
+            return result;
+        };
+        auto result = collect();
+        if (!uncertain.empty()) {
+            for (const auto &link : uncertain)
+                connect(link.first, link.second);
+            auto possible = collect();
+            for (size_t i = 0; i < result.size(); ++i) {
+                const auto original = result[i];
+                const auto candidate = possible[i];
+                uint32_t same = ~(original.value ^ candidate.value) & ~(original.known ^ candidate.known) &
+                                ~(original.z ^ candidate.z) & ~(original.error ^ candidate.error) &
+                                mask(original.width);
+                result[i] = {original.width, original.value & same, original.known & same,
+                             original.z & same, original.error & same};
+            }
+        }
+        return result;
+    }
     bool step() {
-        // Evaluate the entire time batch against old net values, then publish all changed nets.
-        // Updating nets inside the first loop would make clock sampling depend on component order.
+        // 整批事件都基于旧网络值求值，再统一发布所有变化网络。
+        // 若在第一个循环里就更新网络，时钟采样会依赖元件排列顺序。
         if (queue.empty() || oscillating)
             return false;
         auto it = queue.begin();
@@ -1135,14 +1730,20 @@ struct Simulator::Impl {
             for (auto &out : n.outputs)
                 if (before[out.first] != out.second) {
                     affected.insert(n.nets[out.first]);
-                    traces.push_back({now, n.path, out.first, out.second.text()});
+                    record({now, n.path, out.first, out.second.text()});
                 }
         }
         if (traces.size() > 2000)
             traces.erase(traces.begin(), traces.begin() + ptrdiff_t(traces.size() - 2000));
+        std::vector<Signal> switched;
+        if (hasSwitches) {
+            switched = switchedSignals();
+            for (size_t i = 0; i < nets.size(); ++i)
+                affected.insert(int(i));
+        }
         for (auto i : affected) {
             auto &net = nets[i];
-            auto s = resolve(net);
+            auto s = hasSwitches ? switched[i] : resolve(net);
             if (s != net.signal) {
                 net.signal = s;
                 for (auto user : net.users)
@@ -1162,7 +1763,8 @@ void Simulator::reset() {
 void Simulator::setInput(const std::string &id, uint32_t value) {
     for (size_t i = 0; i < impl->nodes.size(); ++i) {
         auto &n = impl->nodes[i];
-        if (n.path == id && (n.part.kind == "Input" || n.part.kind == "Button")) {
+        if (n.path == id && (n.part.kind == "Input" || n.part.kind == "Button" || n.part.kind == "Joystick")) {
+            n.inputValue = value;
             n.state = Signal::number(value, n.part.width);
             impl->queue[impl->now + 1].insert(i);
             return;
@@ -1173,6 +1775,7 @@ void Simulator::setInput(const std::string &id, uint32_t value) {
 bool Simulator::step() {
     return impl->step();
 }
+// 连续推进事件批次直到队列为空或预算耗尽；预算耗尽说明电路振荡或传播过长。
 bool Simulator::settle(size_t budget) {
     size_t count = 0;
     while (!impl->queue.empty() && !impl->oscillating && count++ < budget)
@@ -1186,12 +1789,18 @@ bool Simulator::settle(size_t budget) {
     }
     return !impl->oscillating;
 }
+// 一个基础节拍是用户定义的离散时钟刻度，与传播事件时间和界面播放毫秒数分离。
+// highTicks=lowTicks=1 时保留原来每次 tick 翻转一次的旧工程行为。
 void Simulator::tick() {
+    ++impl->ticks;
     for (size_t i = 0; i < impl->nodes.size(); ++i) {
         auto &n = impl->nodes[i];
         if (n.part.kind == "Clock") {
-            n.state = Signal::number(n.state.value ? 0 : 1, n.part.width);
-            impl->queue[impl->now + 1].insert(i);
+            auto value = Signal::number(impl->clockValue(n, impl->ticks), 1);
+            if (value != n.state) {
+                n.state = value;
+                impl->queue[impl->now + 1].insert(i);
+            }
         }
     }
     settle();
@@ -1199,6 +1808,35 @@ void Simulator::tick() {
 Signal Simulator::read(const Endpoint &e) const {
     auto it = impl->roots.find(e.key());
     return it == impl->roots.end() ? Signal::unknown(1) : impl->nets[it->second].signal;
+}
+std::vector<Signal> Simulator::memory(const std::string &path) const {
+    for (const auto &node : impl->nodes)
+        if (node.path == path && (node.part.kind == "RAM" || node.part.kind == "ROM"))
+            return node.memory;
+    throw std::runtime_error("不是可观察的存储器实例：" + path);
+}
+void Simulator::typeText(const std::string &path, const std::string &utf8) {
+    for (size_t i = 0; i < impl->nodes.size(); ++i) {
+        auto &node = impl->nodes[i];
+        if (node.path == path && node.part.kind == "Keyboard") {
+            if (node.keyboard.size() + utf8.size() > 65536)
+                throw std::runtime_error("键盘缓冲区最多 65536 字节");
+            for (unsigned char ch : utf8)
+                node.keyboard.push_back(ch);
+            impl->queue[impl->now + 1].insert(i);
+            return;
+        }
+    }
+    throw std::runtime_error("不是键盘实例：" + path);
+}
+std::string Simulator::text(const std::string &path) const {
+    for (const auto &node : impl->nodes)
+        if (node.path == path && node.part.kind == "TTY")
+            return node.terminal;
+    throw std::runtime_error("不是终端实例：" + path);
+}
+void Simulator::setTraceSink(std::function<void(const Trace &)> sink) {
+    impl->traceSink = std::move(sink);
 }
 std::vector<Issue> Simulator::issues() const {
     std::vector<Issue> result;
@@ -1208,9 +1846,9 @@ std::vector<Issue> Simulator::issues() const {
             message = "总线位宽不匹配";
         else if (n.signal.error)
             message = "驱动冲突或非法运算 (E)";
-        else if (n.signal.z && !n.users.empty())
+        else if (n.signal.z && !n.users.empty() && !n.optionalOnly)
             message = "输入悬空 / 高阻态 (Z)";
-        else if (!n.signal.defined() && !n.users.empty())
+        else if (!n.signal.defined() && !n.users.empty() && !n.optionalOnly)
             message = "输入包含未知值 (X)";
         if (!message.empty())
             for (auto &object : n.objects)
@@ -1226,6 +1864,15 @@ const std::vector<Trace> &Simulator::trace() const {
 uint64_t Simulator::time() const {
     return impl->now;
 }
+uint64_t Simulator::ticks() const {
+    return impl->ticks;
+}
+uint64_t Simulator::cycles() const {
+    return impl->ticks / 2;
+}
+bool Simulator::oscillating() const {
+    return impl->oscillating;
+}
 size_t Simulator::pending() const {
     size_t n = 0;
     for (auto &b : impl->queue)
@@ -1233,8 +1880,8 @@ size_t Simulator::pending() const {
     return n;
 }
 std::string Simulator::netlist(bool kicad) const {
-    // Read the same union-find result used by simulation. Crossing drawings do not create nets.
-    // This method intentionally reads topology only, never live signals, clocks or event queues.
+    // 复用仿真所用的并查集结果。画面交叉不会产生网络。
+    // 该方法有意只读拓扑，绝不触碰实时信号、时钟或事件队列。
     json result = {{"format", "PracticeEDA.netlist"}, {"version", 1},
                    {"project", impl->project.name},   {"circuit", impl->root},
                    {"components", json::array()},     {"nets", json::array()}};
@@ -1251,7 +1898,7 @@ std::string Simulator::netlist(bool kicad) const {
     }
     for (const auto &entry : impl->roots)
         result["nets"][entry.second]["aliases"].push_back(entry.first);
-    // Keep engineer-assigned labels with their instance scope; equal labels in different instances differ.
+    // 工程师指定的 label 保留其所在实例的作用域；不同实例中的同名 label 彼此不同。
     std::function<void(const Circuit &, const std::string &)> addLabels = [&](const Circuit &c,
                                                                               const std::string &prefix) {
         for (const auto &n : c.nodes)
@@ -1269,7 +1916,8 @@ std::string Simulator::netlist(bool kicad) const {
         const auto ref = "U" + std::to_string(i + 1);
         json component = {{"ref", ref},          {"path", node.path},    {"kind", part.kind},
                           {"label", part.label}, {"width", part.width},  {"value", part.value},
-                          {"data", part.data},   {"pins", json::array()}};
+                          {"data", part.data},   {"pins", json::array()}, {"rotation", part.rotation},
+                          {"params", part.params}, {"bitGroups", part.bitGroups}};
         for (const auto &pin : ports(impl->project, part)) {
             const int net = node.nets.at(pin.id);
             component["pins"].push_back({{"id", pin.id},
@@ -1283,8 +1931,8 @@ std::string Simulator::netlist(bool kicad) const {
     if (!kicad)
         return result.dump(2) + "\n";
 
-    // KiCad's generic S-expression connectivity uses scalar pins. Export every bus bit explicitly.
-    // These are logical primitives without PCB footprints or analog SPICE models.
+    // KiCad 的通用 S-expression 连接使用标量引脚，因此要把每个总线位显式展开。
+    // 这些都是逻辑原语，没有 PCB 封装或模拟 SPICE 模型。
     auto quoted = [](const std::string &s) { return json(s).dump(); };
     std::ostringstream out;
     out << "(export (version \"D\")\n  (design (source " << quoted(impl->root)
@@ -1314,7 +1962,8 @@ std::string Simulator::netlist(bool kicad) const {
     return out.str();
 }
 
-// Truth-table analysis uses fresh simulators, so exploring input combinations cannot change the editor.
+// 穷举组合电路的所有输入组合生成真值表（输入总位数≤10）。
+// 真值表分析使用全新的仿真器，因此遍历输入组合不会改变编辑器状态。
 Table truthTable(const Project &p, const std::string &circuit) {
     p.validate();
     std::set<std::string> visited;
@@ -1436,9 +2085,9 @@ std::string Table::csv() const {
         out << '"';
     };
     for (auto &s : inputs)
-        cell(s);
+        cell("IN:" + s);
     for (auto &s : outputs)
-        cell(s);
+        cell("OUT:" + s);
     out << '\n';
     for (auto &r : rows) {
         for (size_t i = 0; i < r.size(); ++i) {
@@ -1450,6 +2099,7 @@ std::string Table::csv() const {
     }
     return out.str();
 }
+// 手写递归下降解析器求表达式真值表，优先级：非(!/~) > 与(&/*) > 异或(^) > 或(|/+)。
 Table expressionTable(const std::string &text) {
     if (text.size() > 4096)
         throw std::runtime_error("表达式太长");

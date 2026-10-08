@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-08",
+  "slides": 25,
+  "minutes": 18,
+  "nativeTables": 4,
+  "notesMatchContentSource": true,
+  "sourceExcerptsMatch": true,
+  "imageMatchesPptx": true,
+  "debugCtest": 11,
+  "releaseCtest": 11,
+  "guiMarkerSets": 2,
+  "logisimExamples": 33,
+  "pcbConnectedPads": 36,
+  "pptxSha256": "5509e98d9349d7b59cf4a00b7379bee470c830192eb213a029cf987747ce5dc4",
+  "releaseExeSha256": "f920fbbeac828a518c91f617fa801a6db28f4b9059643c3cf671db0e89038454"
+}

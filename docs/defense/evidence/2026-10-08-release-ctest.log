@@ -1,0 +1,212 @@
+Start testing: Oct 08 20:39 中国标准时间
+----------------------------------------------------------
+1/11 Testing: digital_logic_tests
+1/11 Test: digital_logic_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/logic_tests.exe"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"digital_logic_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+PASS 209 digital checks
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"digital_logic_tests" end time: Oct 08 20:39 中国标准时间
+"digital_logic_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/11 Testing: component_netlist_tests
+2/11 Test: component_netlist_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/component_netlist_tests.exe" "D:/zongshe/ElectronicComponent_Practice-/build/qa-features/Release"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"component_netlist_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+PASS 167 feature checks
+<end of output>
+Test time =   0.10 sec
+----------------------------------------------------------
+Test Passed.
+"component_netlist_tests" end time: Oct 08 20:39 中国标准时间
+"component_netlist_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/11 Testing: circ_import_tests
+3/11 Test: circ_import_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/circ_import_tests.exe"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"circ_import_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+澶栭儴鐢佃矾 import: 1066 checks passed
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"circ_import_tests" end time: Oct 08 20:39 中国标准时间
+"circ_import_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/11 Testing: shape_tests
+4/11 Test: shape_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/shape_tests.exe"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"shape_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+Shapes: 28 checks passed
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"shape_tests" end time: Oct 08 20:39 中国标准时间
+"shape_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/11 Testing: analysis_tests
+5/11 Test: analysis_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/analysis_tests.exe"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"analysis_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+3688 analysis checks passed
+<end of output>
+Test time =   0.16 sec
+----------------------------------------------------------
+Test Passed.
+"analysis_tests" end time: Oct 08 20:39 中国标准时间
+"analysis_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/11 Testing: advanced_core_tests
+6/11 Test: advanced_core_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/advanced_core_tests.exe"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"advanced_core_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+advanced core: 103 checks passed
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"advanced_core_tests" end time: Oct 08 20:39 中国标准时间
+"advanced_core_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/11 Testing: circ_exchange_tests
+7/11 Test: circ_exchange_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/circ_exchange_tests.exe" "D:/zongshe/ElectronicComponent_Practice-/build/qa-circ-exchange/Release"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"circ_exchange_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+circ exchange: 211 checks passed
+<end of output>
+Test time =   0.16 sec
+----------------------------------------------------------
+Test Passed.
+"circ_exchange_tests" end time: Oct 08 20:39 中国标准时间
+"circ_exchange_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/11 Testing: pcb_export_tests
+8/11 Test: pcb_export_tests
+Command: "D:/zongshe/ElectronicComponent_Practice-/build/Release/pcb_export_tests.exe" "D:/zongshe/ElectronicComponent_Practice-/build/qa-pcb/Release"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"pcb_export_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+PCB mapping: counts, power pins, decoupling, read-only export and unsupported bus checks passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"pcb_export_tests" end time: Oct 08 20:39 中国标准时间
+"pcb_export_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/11 Testing: netlist_format_tests
+9/11 Test: netlist_format_tests
+Command: "C:/Users/Chang/AppData/Local/Programs/Python/Python312/python.exe" "D:/zongshe/ElectronicComponent_Practice-/tests/verify_netlists.py" "D:/zongshe/ElectronicComponent_Practice-/build/qa-features/Release"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"netlist_format_tests" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+PASS 65 independently parsed netlist pairs
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"netlist_format_tests" end time: Oct 08 20:39 中国标准时间
+"netlist_format_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/11 Testing: logisim_exchange_validation
+10/11 Test: logisim_exchange_validation
+Command: "C:/Users/Chang/AppData/Local/Programs/Python/Python312/python.exe" "D:/zongshe/ElectronicComponent_Practice-/tests/verify_logisim_exchange.py" "D:/zongshe/ElectronicComponent_Practice-/../Logisim2.7.1.cn-v3/JRE/bin/java.exe" "D:/zongshe/ElectronicComponent_Practice-/../Logisim2.7.1.cn-v3/Logisim.jar" "D:/zongshe/ElectronicComponent_Practice-/build/qa-circ-exchange/Release"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"logisim_exchange_validation" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+PASS arithmetic-Add.circ [15] [15] 
+PASS arithmetic-BitAdder.circ [2] [2] 
+PASS arithmetic-BitFinder.circ [2] [2] 
+PASS arithmetic-Compare.circ [1] [1] 
+PASS arithmetic-Divide.circ [4] [4] 
+PASS arithmetic-Multiply.circ [36] [36] 
+PASS arithmetic-Subtract.circ [9] [9] 
+PASS counter-sequence.circ [0, 1, 2, 3] [0, 1, 2, 3] 
+PASS extra-BitSelector.circ [1] [1] 
+PASS extra-ControlledInverter.circ [90] [90] 
+PASS extra-EvenParity.circ [1] [1] 
+PASS extra-OddParity.circ [0] [0] 
+PASS extra-ShiftLeft.circ [148] [148] 
+PASS extra-ShiftRight.circ [41] [41] 
+PASS gate-rotation-0.circ [160] [160] 
+PASS gate-rotation-1.circ [160] [160] 
+PASS gate-rotation-2.circ [160] [160] 
+PASS gate-rotation-3.circ [160] [160] 
+PASS memory-RAM.circ [165] [165] 
+PASS memory-ROM.circ [165] [165] 
+PASS reverse-join.circ [165] [165] 
+PASS reverse-split.circ [15] [15] 
+PASS select-Decoder.circ [1] [1] 
+PASS select-Encoder.circ [5] [5] 
+PASS select-Mux.circ [1] [1] 
+PASS sequence-DFF.circ [0, 165] [0, 165] 
+PASS sequence-JKFF.circ [0, 1] [0, 1] 
+PASS sequence-RAM.circ [165, 90] [165, 90] 
+PASS sequence-Register.circ [0, 165] [0, 165] 
+PASS sequence-ShiftRegister.circ [0, 1, 3, 7] [0, 1, 3, 7] 
+PASS sequence-SRFF.circ [0, 1] [0, 1] 
+PASS sequence-TFF.circ [0, 1, 0, 1] [0, 1, 0, 1] 
+PASS three-level-custom-interface.circ [90] [90] 
+Logisim 2.7.1: 33/33 files passed
+<end of output>
+Test time =   5.29 sec
+----------------------------------------------------------
+Test Passed.
+"logisim_exchange_validation" end time: Oct 08 20:39 中国标准时间
+"logisim_exchange_validation" time elapsed: 00:00:05
+----------------------------------------------------------
+
+11/11 Testing: kicad_pcb_validation
+11/11 Test: kicad_pcb_validation
+Command: "C:/Users/Chang/AppData/Local/Programs/Python/Python312/python.exe" "D:/zongshe/ElectronicComponent_Practice-/tests/verify_pcb_exchange.py" "D:/zongshe/ElectronicComponent_Practice-/build/qa-tools/kicad-runtime/bin/kicad-cli.exe" "D:/zongshe/ElectronicComponent_Practice-/build/qa-pcb/Release"
+Directory: D:/zongshe/ElectronicComponent_Practice-/build
+"kicad_pcb_validation" start time: Oct 08 20:39 中国标准时间
+Output:
+----------------------------------------------------------
+{"tool": "10.0.7", "components": 9, "nets": 6, "connectedPads": 36, "standardNetlistMatchesLoadedBoard": true, "method": "KiCad loads paired native PCB, exports IPC-D-356; compare every assigned pad to standard .net", "directNetlistGuiImportTested": false, "routed": false}
+<end of output>
+Test time =   0.35 sec
+----------------------------------------------------------
+Test Passed.
+"kicad_pcb_validation" end time: Oct 08 20:39 中国标准时间
+"kicad_pcb_validation" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 08 20:39 中国标准时间

@@ -1,0 +1,442 @@
+{
+  "components": [
+    {
+      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+      "pads": [
+        {
+          "name": "VCC",
+          "net": 1,
+          "pad": 1
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 2
+        }
+      ],
+      "path": "power",
+      "ref": "J1",
+      "value": "POWER_5V"
+    },
+    {
+      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+      "pads": [
+        {
+          "name": "N1",
+          "net": 3,
+          "pad": 1
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 2
+        }
+      ],
+      "path": "p1",
+      "ref": "J2",
+      "value": "A"
+    },
+    {
+      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+      "pads": [
+        {
+          "name": "N2",
+          "net": 4,
+          "pad": 1
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 2
+        }
+      ],
+      "path": "p2",
+      "ref": "J3",
+      "value": "B"
+    },
+    {
+      "footprint": "Package_DIP:DIP-14_W7.62mm",
+      "pads": [
+        {
+          "name": "N1",
+          "net": 3,
+          "pad": 1
+        },
+        {
+          "name": "N2",
+          "net": 4,
+          "pad": 2
+        },
+        {
+          "name": "N3",
+          "net": 5,
+          "pad": 3
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 4
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 5
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 7
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 9
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 10
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 12
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 13
+        },
+        {
+          "name": "VCC",
+          "net": 1,
+          "pad": 14
+        }
+      ],
+      "path": "p3",
+      "ref": "U1",
+      "value": "74HC86"
+    },
+    {
+      "footprint": "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm",
+      "pads": [
+        {
+          "name": "VCC",
+          "net": 1,
+          "pad": 1
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 2
+        }
+      ],
+      "path": "p3/decoupling",
+      "ref": "C1",
+      "value": "100nF"
+    },
+    {
+      "footprint": "Package_DIP:DIP-14_W7.62mm",
+      "pads": [
+        {
+          "name": "N1",
+          "net": 3,
+          "pad": 1
+        },
+        {
+          "name": "N2",
+          "net": 4,
+          "pad": 2
+        },
+        {
+          "name": "N4",
+          "net": 6,
+          "pad": 3
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 4
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 5
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 7
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 9
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 10
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 12
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 13
+        },
+        {
+          "name": "VCC",
+          "net": 1,
+          "pad": 14
+        }
+      ],
+      "path": "p4",
+      "ref": "U2",
+      "value": "74HC08"
+    },
+    {
+      "footprint": "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm",
+      "pads": [
+        {
+          "name": "VCC",
+          "net": 1,
+          "pad": 1
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 2
+        }
+      ],
+      "path": "p4/decoupling",
+      "ref": "C2",
+      "value": "100nF"
+    },
+    {
+      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+      "pads": [
+        {
+          "name": "N3",
+          "net": 5,
+          "pad": 1
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 2
+        }
+      ],
+      "path": "p5",
+      "ref": "J4",
+      "value": "Sum"
+    },
+    {
+      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+      "pads": [
+        {
+          "name": "N4",
+          "net": 6,
+          "pad": 1
+        },
+        {
+          "name": "GND",
+          "net": 2,
+          "pad": 2
+        }
+      ],
+      "path": "p6",
+      "ref": "J5",
+      "value": "Carry"
+    }
+  ],
+  "format": "PracticeEDA.physical-mapping",
+  "nets": [
+    {
+      "id": 1,
+      "members": [
+        {
+          "pad": 1,
+          "ref": "J1"
+        },
+        {
+          "pad": 14,
+          "ref": "U1"
+        },
+        {
+          "pad": 1,
+          "ref": "C1"
+        },
+        {
+          "pad": 14,
+          "ref": "U2"
+        },
+        {
+          "pad": 1,
+          "ref": "C2"
+        }
+      ],
+      "name": "VCC"
+    },
+    {
+      "id": 2,
+      "members": [
+        {
+          "pad": 2,
+          "ref": "J1"
+        },
+        {
+          "pad": 2,
+          "ref": "J2"
+        },
+        {
+          "pad": 2,
+          "ref": "J3"
+        },
+        {
+          "pad": 4,
+          "ref": "U1"
+        },
+        {
+          "pad": 5,
+          "ref": "U1"
+        },
+        {
+          "pad": 7,
+          "ref": "U1"
+        },
+        {
+          "pad": 9,
+          "ref": "U1"
+        },
+        {
+          "pad": 10,
+          "ref": "U1"
+        },
+        {
+          "pad": 12,
+          "ref": "U1"
+        },
+        {
+          "pad": 13,
+          "ref": "U1"
+        },
+        {
+          "pad": 2,
+          "ref": "C1"
+        },
+        {
+          "pad": 4,
+          "ref": "U2"
+        },
+        {
+          "pad": 5,
+          "ref": "U2"
+        },
+        {
+          "pad": 7,
+          "ref": "U2"
+        },
+        {
+          "pad": 9,
+          "ref": "U2"
+        },
+        {
+          "pad": 10,
+          "ref": "U2"
+        },
+        {
+          "pad": 12,
+          "ref": "U2"
+        },
+        {
+          "pad": 13,
+          "ref": "U2"
+        },
+        {
+          "pad": 2,
+          "ref": "C2"
+        },
+        {
+          "pad": 2,
+          "ref": "J4"
+        },
+        {
+          "pad": 2,
+          "ref": "J5"
+        }
+      ],
+      "name": "GND"
+    },
+    {
+      "id": 3,
+      "members": [
+        {
+          "pad": 1,
+          "ref": "J2"
+        },
+        {
+          "pad": 1,
+          "ref": "U1"
+        },
+        {
+          "pad": 1,
+          "ref": "U2"
+        }
+      ],
+      "name": "N1"
+    },
+    {
+      "id": 4,
+      "members": [
+        {
+          "pad": 1,
+          "ref": "J3"
+        },
+        {
+          "pad": 2,
+          "ref": "U1"
+        },
+        {
+          "pad": 2,
+          "ref": "U2"
+        }
+      ],
+      "name": "N2"
+    },
+    {
+      "id": 5,
+      "members": [
+        {
+          "pad": 3,
+          "ref": "U1"
+        },
+        {
+          "pad": 1,
+          "ref": "J4"
+        }
+      ],
+      "name": "N3"
+    },
+    {
+      "id": 6,
+      "members": [
+        {
+          "pad": 3,
+          "ref": "U2"
+        },
+        {
+          "pad": 1,
+          "ref": "J5"
+        }
+      ],
+      "name": "N4"
+    }
+  ],
+  "routed": false,
+  "sourceCircuit": "main",
+  "version": 1
+}

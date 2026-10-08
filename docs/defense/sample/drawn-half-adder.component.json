@@ -1,0 +1,304 @@
+{
+  "format": "PracticeEDA.component",
+  "version": 1,
+  "project": {
+    "circuits": [
+      {
+        "name": "HalfAdder",
+        "nodes": [],
+        "parts": [
+          {
+            "at": [
+              130.0,
+              140.0
+            ],
+            "circuit": "",
+            "data": [],
+            "id": "p1",
+            "kind": "Input",
+            "label": "A",
+            "value": 0,
+            "width": 1
+          },
+          {
+            "at": [
+              130.0,
+              340.0
+            ],
+            "circuit": "",
+            "data": [],
+            "id": "p2",
+            "kind": "Input",
+            "label": "B",
+            "value": 0,
+            "width": 1
+          },
+          {
+            "at": [
+              410.0,
+              130.0
+            ],
+            "circuit": "",
+            "data": [],
+            "id": "p3",
+            "kind": "Xor",
+            "label": "XOR",
+            "value": 0,
+            "width": 1
+          },
+          {
+            "at": [
+              410.0,
+              350.0
+            ],
+            "circuit": "",
+            "data": [],
+            "id": "p4",
+            "kind": "And",
+            "label": "AND",
+            "value": 0,
+            "width": 1
+          },
+          {
+            "at": [
+              670.0,
+              130.0
+            ],
+            "circuit": "",
+            "data": [],
+            "id": "p5",
+            "kind": "Output",
+            "label": "Sum",
+            "value": 0,
+            "width": 1
+          },
+          {
+            "at": [
+              670.0,
+              350.0
+            ],
+            "circuit": "",
+            "data": [],
+            "id": "p6",
+            "kind": "Output",
+            "label": "Carry",
+            "value": 0,
+            "width": 1
+          }
+        ],
+        "wires": [
+          {
+            "a": [
+              "p1",
+              "Y"
+            ],
+            "b": [
+              "p3",
+              "A"
+            ],
+            "bends": [
+              [
+                240.0,
+                140.0
+              ],
+              [
+                240.0,
+                120.0
+              ]
+            ],
+            "id": "w7"
+          },
+          {
+            "a": [
+              "p2",
+              "Y"
+            ],
+            "b": [
+              "p3",
+              "B"
+            ],
+            "bends": [
+              [
+                280.0,
+                340.0
+              ],
+              [
+                280.0,
+                140.0
+              ]
+            ],
+            "id": "w8"
+          },
+          {
+            "a": [
+              "p1",
+              "Y"
+            ],
+            "b": [
+              "p4",
+              "A"
+            ],
+            "bends": [
+              [
+                240.0,
+                140.0
+              ],
+              [
+                240.0,
+                340.0
+              ]
+            ],
+            "id": "w9"
+          },
+          {
+            "a": [
+              "p2",
+              "Y"
+            ],
+            "b": [
+              "p4",
+              "B"
+            ],
+            "bends": [
+              [
+                280.0,
+                340.0
+              ],
+              [
+                280.0,
+                360.0
+              ]
+            ],
+            "id": "w10"
+          },
+          {
+            "a": [
+              "p3",
+              "Y"
+            ],
+            "b": [
+              "p5",
+              "A"
+            ],
+            "bends": [],
+            "id": "w11"
+          },
+          {
+            "a": [
+              "p4",
+              "Y"
+            ],
+            "b": [
+              "p6",
+              "A"
+            ],
+            "bends": [],
+            "id": "w12"
+          }
+        ],
+        "shapes": [
+          {
+            "id": "s13",
+            "kind": "Line",
+            "a": [
+              -50,
+              -35
+            ],
+            "b": [
+              10,
+              -35
+            ],
+            "control": [
+              0,
+              0
+            ],
+            "stroke": 2,
+            "filled": false,
+            "appearance": true
+          },
+          {
+            "id": "s14",
+            "kind": "Curve",
+            "a": [
+              10,
+              -35
+            ],
+            "b": [
+              10,
+              35
+            ],
+            "control": [
+              90,
+              0
+            ],
+            "stroke": 2,
+            "filled": false,
+            "appearance": true
+          },
+          {
+            "id": "s15",
+            "kind": "Line",
+            "a": [
+              10,
+              35
+            ],
+            "b": [
+              -50,
+              35
+            ],
+            "control": [
+              0,
+              0
+            ],
+            "stroke": 2,
+            "filled": false,
+            "appearance": true
+          },
+          {
+            "id": "s16",
+            "kind": "Line",
+            "a": [
+              -50,
+              35
+            ],
+            "b": [
+              -50,
+              -35
+            ],
+            "control": [
+              0,
+              0
+            ],
+            "stroke": 2,
+            "filled": false,
+            "appearance": true
+          },
+          {
+            "id": "s17",
+            "kind": "Circle",
+            "a": [
+              -16,
+              -16
+            ],
+            "b": [
+              16,
+              16
+            ],
+            "control": [
+              0,
+              0
+            ],
+            "stroke": 2,
+            "filled": false,
+            "appearance": true
+          }
+        ]
+      }
+    ],
+    "format": "PracticeEDA.logic",
+    "main": "HalfAdder",
+    "name": "HalfAdder",
+    "nextId": 18,
+    "version": 1
+  }
+}

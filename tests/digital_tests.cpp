@@ -1,4 +1,4 @@
-// Baseline regression suite: logic truth tables, event timing, storage, hierarchy and file rejection.
+// 基础回归测试套件：逻辑真值表、事件时序、存储、层次结构与文件拒绝。
 #include "Digital.h"
 #include <iostream>
 using namespace eda;
@@ -243,7 +243,7 @@ int main(int argc, char **argv) {
             s.settle();
             check(s.read({o, "A"}).value == 1, "same-name tunnels");
         }
-        // Hierarchical register instances must keep independent state, including after serialization.
+        // 层次化的寄存器实例必须保持独立状态，包括序列化之后。
         {
             Fixture f;
             Circuit child;
@@ -417,7 +417,7 @@ int main(int argc, char **argv) {
                   "copied tunnel names retain connectivity");
         }
         {
-            // Deliberately non-monotonic IDs catch double-remapping of imported port IDs.
+            // 故意使用非单调 ID，以捕获导入端口 ID 被重复重映射的问题。
             Project p;
             Circuit child;
             child.name = "leaf";
@@ -445,7 +445,92 @@ int main(int argc, char **argv) {
             json.replace(at, 10, "\"width\": 1.5");
             rejects([&] { eda::logic::deserialize(json); }, "fractional bit width rejected");
         }
-        // Exercise evaluation of every exposed component; catches missing pin/evaluator branches.
+        // 未接线的 CLR 属于可选控制脚，不应被报成悬空输入。
+        {
+            Fixture f;
+            auto clk = f.add("Clock"), d = f.add("Constant", 4, 7);
+            auto reg = f.add("Register", 4), out = f.add("Output", 4);
+            f.wire(clk, "Y", reg, "CLK");
+            f.wire(d, "Y", reg, "D");
+            f.wire(reg, "Q", out, "A");
+            Simulator s(f.p, "main");
+            check(s.settle() && s.issues().empty(), "an unconnected CLR stays silent");
+        }
+        // 计数器：CARRY 终端计数、CLR 异步清零、时钟周期计数。
+        {
+            Fixture f;
+            auto clk = f.add("Clock"), en = f.add("Constant", 1, 1), clr = f.add("Input");
+            auto cnt = f.add("Counter", 2);
+            auto carry = f.add("Output"), q = f.add("Output", 2);
+            f.wire(clk, "Y", cnt, "CLK");
+            f.wire(en, "Y", cnt, "EN");
+            f.wire(clr, "Y", cnt, "CLR");
+            f.wire(cnt, "CARRY", carry, "A");
+            f.wire(cnt, "Q", q, "A");
+            Simulator s(f.p, "main");
+            check(s.settle(), "counter circuit settles");
+            check(s.read({cnt, "Q"}).value == 0, "counter starts at its initial value");
+            check(s.read({cnt, "CARRY"}).value == 0, "carry is low below the maximum");
+            auto cycle = [&] { s.tick(); s.tick(); };   // 两个半周期产生一个上升沿
+            cycle();
+            check(s.read({cnt, "Q"}).value == 1, "counter advances on the rising edge");
+            cycle();
+            cycle();
+            check(s.read({cnt, "Q"}).value == 3, "counter reaches the maximum");
+            check(s.read({cnt, "CARRY"}).value == 1, "carry is high at the maximum");
+            cycle();
+            check(s.read({cnt, "Q"}).value == 0, "counter wraps to zero");
+            check(s.read({cnt, "CARRY"}).value == 0, "carry clears after the wrap");
+            cycle();
+            check(s.read({cnt, "Q"}).value == 1, "counter counts again after the wrap");
+            // CLR 异步生效：只 settle（不翻转时钟）就应清零
+            s.setInput(clr, 1);
+            s.settle();
+            check(s.read({cnt, "Q"}).value == 0, "clear acts without a clock edge");
+            s.tick();
+            check(s.read({cnt, "Q"}).value == 0, "clear outranks the clock edge");
+            s.setInput(clr, 0);
+            s.settle();
+            cycle();
+            check(s.read({cnt, "Q"}).value == 1, "counter resumes after clear is released");
+            // 时钟周期计数
+            auto beforeTicks = s.ticks();
+            s.tick();
+            s.tick();
+            check(s.ticks() == beforeTicks + 2, "two half cycles make one cycle");
+            check(s.cycles() == s.ticks() / 2, "cycle count is half the tick count");
+            s.reset();
+            check(s.ticks() == 0 && s.cycles() == 0, "reset clears the cycle counter");
+            check(s.read({cnt, "Q"}).value == 0, "reset restores the counter's initial value");
+        }
+        // CARRY 级联：低位溢出驱动高位使能，两级 4 位计数器应构成 8 位计数。
+        {
+            Fixture f;
+            auto clk = f.add("Clock"), en = f.add("Constant", 1, 1);
+            auto lo = f.add("Counter", 4), hi = f.add("Counter", 4);
+            auto loOut = f.add("Output", 4), hiOut = f.add("Output", 4);
+            f.wire(clk, "Y", lo, "CLK");
+            f.wire(clk, "Y", hi, "CLK");
+            f.wire(en, "Y", lo, "EN");
+            f.wire(lo, "CARRY", hi, "EN");
+            f.wire(lo, "Q", loOut, "A");
+            f.wire(hi, "Q", hiOut, "A");
+            Simulator s(f.p, "main");
+            s.settle();
+            auto joined = [&] {
+                return uint32_t(s.read({lo, "Q"}).value) | (uint32_t(s.read({hi, "Q"}).value) << 4);
+            };
+            for (int i = 0; i < 15; ++i) {
+                s.tick();
+                s.tick();
+            }
+            check(joined() == 15, "low counter reaches fifteen");
+            s.tick();
+            s.tick();
+            check(joined() == 16, "carry propagates into the high counter");
+            check(s.read({hi, "Q"}).value == 1, "high counter advances on overflow");
+        }
+        // 遍历求值每个公开元件；捕获缺失的引脚/求值分支。
         for (auto &info : library()) {
             Fixture f;
             auto id = f.add(info.kind);

@@ -1,4 +1,4 @@
-// Vector artwork shared by the canvas, placement preview and image export; ports() owns pin positions.
+// 画布、放置预览与图像导出共享的矢量绘图；引脚位置由 ports() 决定。
 #include "LogicSymbols.h"
 #include <cmath>
 
@@ -66,7 +66,7 @@ std::string blockName(const Part &p) {
     if (p.kind == "Subcircuit")
         return p.circuit;
     auto it = names.find(p.kind);
-    return it == names.end() ? std::string{} : it->second;
+    return it == names.end() ? p.kind : it->second;
 }
 } // namespace
 
@@ -106,7 +106,9 @@ void drawShape(wxGraphicsContext &g, const Shape &s, bool selected, bool preview
 void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
                 const std::function<Signal(const Port &)> &read, bool selected, bool error, bool preview) {
     const auto &k = part.kind;
-    auto pp = ports(project, part);
+    // 先在标准方向绘制，再整体旋转；ports() 已旋转，故这里用未旋转副本避免二次旋转。
+    auto canonical=part; canonical.rotation=0;
+    auto pp = ports(project, canonical);
     double h = partHeight(project, part);
     wxColour ink(error ? "#dc2626" : selected ? "#6366f1" : preview ? "#8b98a8" : "#26384b");
     wxColour fill(selected ? "#eef2ff" : "#ffffff");
@@ -117,6 +119,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
     };
     g.PushState();
     g.Translate(part.at.x, part.at.y);
+    g.Rotate(part.rotation * 3.14159265358979323846 / 2.0);
     outline();
     bool custom = k == "Subcircuit" && std::any_of(project.circuit(part.circuit).shapes.begin(),
                                                    project.circuit(part.circuit).shapes.end(),
@@ -151,7 +154,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
     Signal value = mainPin == pp.end() ? Signal::unknown(part.width) : read(*mainPin);
     auto liveColour = preview ? ink : signalColour(value);
 
-    // Stubs end on the actual outline; the connection dots remain at model anchors.
+    // 引脚短线终止在实际轮廓上；连接圆点仍留在模型锚点处。
     for (const auto &pin : pp) {
         auto c = preview ? ink : signalColour(read(pin));
         g.SetPen(wxPen(c, pin.width > 1 ? 3 : 1.8));
@@ -159,7 +162,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
         if (triangle || andGate || orGate) {
             end = pin.output ? (inverted ? 52 : 40) : -36;
             if (orGate && !pin.output) {
-                double t = (pin.at.y + 30) / 60;
+                double t = (pin.at.y + h / 2) / h;
                 end = -38 + 28 * t * (1 - t);
             }
         } else if (compact)
@@ -182,8 +185,19 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
                 path(g, {pin.at, {pin.output ? 30.0 : -30.0, pin.at.y}, {0, 0}});
             else
                 g.StrokeLine(pin.at.x, pin.at.y, 0, 0);
+        } else if(custom && project.circuit(part.circuit).interfaceLayout.count(pin.id)) {
+            auto inner=pin.at;
+            if(std::abs(inner.x)>=std::abs(inner.y)) inner.x+=inner.x>0?-16:16;
+            else inner.y+=inner.y>0?-16:16;
+            g.StrokeLine(pin.at.x,pin.at.y,inner.x,inner.y);
         } else
             g.StrokeLine(pin.at.x, pin.at.y, end, pin.at.y);
+        if(!pin.output && (andGate||orGate)) {
+            int index=pin.id=="A"?0:pin.id=="B"?1:pin.id.rfind("I",0)==0?std::stoi(pin.id.substr(1)):0;
+            if(uint64_t(parameter(part,"invertMask",0))&(uint64_t(1)<<index)) {
+                g.SetBrush(wxBrush(fill));g.DrawEllipse(end-8,pin.at.y-4,8,8);
+            }
+        }
         g.SetBrush(wxBrush(c));
         g.DrawEllipse(pin.at.x - 2.5, pin.at.y - 2.5, 5, 5);
         if (pin.width > 1) {
@@ -197,24 +211,24 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
         path(g, {{-36, -30}, {40, 0}, {-36, 30}}, true);
     } else if (andGate) {
         auto p = g.CreatePath();
-        p.MoveToPoint(-36, -30);
-        p.AddLineToPoint(10, -30);
-        p.AddCurveToPoint(50, -30, 50, 30, 10, 30);
-        p.AddLineToPoint(-36, 30);
+        p.MoveToPoint(-36, -h/2);
+        p.AddLineToPoint(10, -h/2);
+        p.AddCurveToPoint(50, -h/2, 50, h/2, 10, h/2);
+        p.AddLineToPoint(-36, h/2);
         p.CloseSubpath();
         g.DrawPath(p);
     } else if (orGate) {
         auto p = g.CreatePath();
-        p.MoveToPoint(-38, -30);
-        p.AddCurveToPoint(-1, -30, 26, -22, 40, 0);
-        p.AddCurveToPoint(26, 22, -1, 30, -38, 30);
-        p.AddQuadCurveToPoint(-24, 0, -38, -30);
+        p.MoveToPoint(-38, -h/2);
+        p.AddCurveToPoint(-1, -h/2, 26, -h*.37, 40, 0);
+        p.AddCurveToPoint(26, h*.37, -1, h/2, -38, h/2);
+        p.AddQuadCurveToPoint(-24, 0, -38, -h/2);
         p.CloseSubpath();
         g.DrawPath(p);
         if (k == "Xor" || k == "Xnor") {
             auto extra = g.CreatePath();
-            extra.MoveToPoint(-47, -30);
-            extra.AddQuadCurveToPoint(-33, 0, -47, 30);
+            extra.MoveToPoint(-47, -h/2);
+            extra.AddQuadCurveToPoint(-33, 0, -47, h/2);
             g.StrokePath(extra);
         }
     } else if (fan) {
@@ -232,7 +246,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
         }
     } else if (compact) {
         if (io) {
-            // Only the body shrinks: saved terminal anchors and existing wires stay identical.
+            // 只有主体缩小：已保存的端子锚点与已有导线保持不变。
             g.SetPen(
                 wxPen(preview ? ink : liveColour, 2, preview ? wxPENSTYLE_SHORT_DASH : wxPENSTYLE_SOLID));
             g.SetBrush(wxBrush(preview ? wxColour("#f1f5f9") : signalFill(value)));
@@ -268,6 +282,35 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
         } else if (k != "LED") {
             label(g, preview ? (k == "Probe" ? "?" : "0") : value.text(), 0, -12, 13, liveColour, 0, 42);
         }
+    } else if(k=="SevenSegment") {
+        g.SetBrush(wxBrush(wxColour("#152536"))); g.DrawRoundedRectangle(-40,-55,80,110,5);
+        const std::pair<Point,Point> segments[]={{{-20,-40},{20,-40}},{{23,-36},{23,-4}},
+            {{23,4},{23,36}},{{-20,40},{20,40}},{{-23,4},{-23,36}},{{-23,-36},{-23,-4}},{{-20,0},{20,0}}};
+        for(size_t index=0;index<7;++index) {
+            auto pin=std::find_if(pp.begin(),pp.end(),[&](const Port &port){return port.id==std::string(1,char('a'+index));});
+            auto signal=pin==pp.end()?Signal::unknown(1):read(*pin);
+            bool active=signal.defined() && bool(signal.value)!=bool(parameter(part,"activeLow",0));
+            g.SetPen(wxPen(wxColour(active?"#55ef9b":"#284252"),5));
+            g.StrokeLine(segments[index].first.x,segments[index].first.y,segments[index].second.x,segments[index].second.y);
+        }
+        auto dot=std::find_if(pp.begin(),pp.end(),[](const Port &port){return port.id=="dp";});
+        bool lit=dot!=pp.end()&&read(*dot).defined()&&bool(read(*dot).value)!=bool(parameter(part,"activeLow",0));
+        g.SetBrush(wxBrush(wxColour(lit?"#55ef9b":"#284252")));g.DrawEllipse(29,37,7,7);
+    } else if(k=="LEDMatrix") {
+        auto rows=std::clamp(int(parameter(part,"rows",8)),1,32),cols=std::clamp(int(parameter(part,"cols",8)),1,32);
+        auto rowPin=std::find_if(pp.begin(),pp.end(),[](const Port &port){return port.id=="ROWS";});
+        auto colPin=std::find_if(pp.begin(),pp.end(),[](const Port &port){return port.id=="COLS";});
+        auto rowSignal=rowPin==pp.end()?Signal::unknown(rows):read(*rowPin);
+        auto colSignal=colPin==pp.end()?Signal::unknown(cols):read(*colPin);
+        g.SetBrush(wxBrush(wxColour("#152536")));g.DrawRoundedRectangle(-45,-45,90,90,4);
+        double dx=80.0/cols,dy=80.0/rows;
+        for(int row=0;row<rows;++row) for(int col=0;col<cols;++col) {
+            bool activeLow=parameter(part,"activeLow",0)!=0;
+            bool lit=rowSignal.defined()&&colSignal.defined()&&
+                bool(rowSignal.value&(uint32_t(1)<<row))!=activeLow && bool(colSignal.value&(uint32_t(1)<<col))!=activeLow;
+            g.SetPen(*wxTRANSPARENT_PEN);g.SetBrush(wxBrush(wxColour(lit?"#55ef9b":"#284252")));
+            g.DrawEllipse(-40+col*dx+1,-40+row*dy+1,std::max(1.0,dx-2),std::max(1.0,dy-2));
+        }
     } else if (k == "Hex") {
         g.SetBrush(wxBrush(wxColour("#152536")));
         g.DrawRoundedRectangle(-52, -27, 104, 54, 4);
@@ -298,7 +341,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
     if (inverted)
         g.DrawEllipse(40, -6, 12, 12);
 
-    // Named block terminals sit inside the body; ordinary gate pins need no A/B/Y labels.
+    // 具名的功能块端子写在主体内部；普通门引脚不需要 A/B/Y 标签。
     for (const auto &pin : pp) {
         if (fan) {
             if ((k == "Splitter" && pin.output) || (k == "Joiner" && !pin.output))
@@ -328,7 +371,13 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
                 if (p && !p->label.empty())
                     name = p->label;
             }
-            label(g, name, x, pin.at.y - 7, 8, ink, pin.output ? 1 : -1, 42);
+            if(k=="Subcircuit" && project.circuit(part.circuit).interfaceLayout.count(pin.id)) {
+                auto position=pin.at;
+                if(std::abs(position.x)>=std::abs(position.y)) {
+                    bool right=position.x>0;position.x+=right?-20:20;
+                    label(g,name,position.x,position.y-7,8,ink,right?1:-1,70);
+                } else { position.y+=position.y>0?-24:10;label(g,name,position.x,position.y,8,ink,0,70); }
+            } else label(g, name, x, pin.at.y - 7, 8, ink, pin.output ? 1 : -1, 42);
         }
     }
     std::string name = blockName(part);

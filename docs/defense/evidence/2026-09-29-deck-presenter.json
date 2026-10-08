@@ -1,0 +1,56 @@
+{
+  "previewNotReloaded": true,
+  "lastPreview": "已到尾页",
+  "firstLastRestart": true,
+  "gridSelect": true,
+  "previewSizes": [
+    {
+      "size": {
+        "width": 1600,
+        "height": 900
+      },
+      "frames": [
+        {
+          "id": "ppt-current-frame",
+          "ratio": 1.7777439024390245,
+          "fits": true
+        },
+        {
+          "id": "ppt-next-frame",
+          "ratio": 1.7776988636363635,
+          "fits": true
+        }
+      ]
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 720
+      },
+      "frames": [
+        {
+          "id": "ppt-current-frame",
+          "ratio": 1.7777777777777777,
+          "fits": true
+        },
+        {
+          "id": "ppt-next-frame",
+          "ratio": 1.7776864035087718,
+          "fits": true
+        }
+      ]
+    }
+  ],
+  "rehearsalSummary": "排练记录\n关闭\n本次总时长\n00:01\n#\t页面\t实际\t与计划相比\n12\t属性直接编辑，保存仍有边界\t00:01\t−00:46\n13\t从可靠连接，交给仿真计算\t00:00\t−00:11\n最近排练\n2026/9/29 15:06:47\n00:01",
+  "timerReset": true,
+  "frozen": true,
+  "screenRestore": true,
+  "annotations": true,
+  "autoPauseResume": true,
+  "preflight": "演前检查\n关闭\n观众屏连接\n当前状态：观众屏 · 已同步 · 第 16 页\n正常\n弹窗权限\n未检测到弹窗拦截\n正常\n全屏状态\n尚未全屏，可在演讲前进入\n建议\n字体加载\n状态：loaded\n正常\n图片资源\n4 / 4 已加载\n正常\n视频资源\n没有视频\n正常\n当前页 16:9\n729 × 410\n正常\n重新检查 进入全屏\n\n这里只能检查浏览器和观众页面的软件状态，不能确认 HDMI、转接器或投影仪线缆是否物理连接。",
+  "closedSync": "disconnected",
+  "reopenSync": true,
+  "audienceClosedOnExit": true,
+  "popupBlocked": "观众屏 · 弹窗被拦截",
+  "errors": []
+}

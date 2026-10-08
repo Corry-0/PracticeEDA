@@ -6,7 +6,7 @@
 #include <wx/wx.h>
 
 namespace eda {
-// Model strings are UTF-8. Windows filesystem paths must instead use native UTF-16.
+// 模型内部字符串使用 UTF-8；Windows 文件系统路径必须使用原生 UTF-16。
 inline wxString U(const std::string &s) {
     return wxString::FromUTF8(s);
 }
