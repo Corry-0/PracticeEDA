@@ -1,0 +1,1 @@
+All library bodies and border terminals: no external leads in 4 rotated raster renders; all border pin hit targets passed; no invisible I/O tail hit regions.

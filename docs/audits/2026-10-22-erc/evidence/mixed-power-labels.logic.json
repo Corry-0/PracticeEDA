@@ -1,0 +1,104 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "id": "j2",
+          "label": "VCC"
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "id": "j3",
+          "label": "GND"
+        }
+      ],
+      "parts": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p1",
+          "kind": "Power",
+          "label": "p1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p4",
+          "kind": "Output",
+          "label": "p4",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "j2",
+            ""
+          ],
+          "bends": [],
+          "id": "w5"
+        },
+        {
+          "a": [
+            "j2",
+            ""
+          ],
+          "b": [
+            "j3",
+            ""
+          ],
+          "bends": [],
+          "id": "w6"
+        },
+        {
+          "a": [
+            "j3",
+            ""
+          ],
+          "b": [
+            "p4",
+            "A"
+          ],
+          "bends": [],
+          "id": "w7"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "数字逻辑工程",
+  "nextId": 8,
+  "version": 1
+}

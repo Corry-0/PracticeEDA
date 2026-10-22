@@ -1,0 +1,91 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p1",
+          "kind": "Constant",
+          "label": "p1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p2",
+          "kind": "Buffer",
+          "label": "U1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p3",
+          "kind": "Buffer",
+          "label": "U1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "p2",
+            "A"
+          ],
+          "bends": [],
+          "id": "w4"
+        },
+        {
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "p3",
+            "A"
+          ],
+          "bends": [],
+          "id": "w5"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "数字逻辑工程",
+  "nextId": 6,
+  "version": 1
+}

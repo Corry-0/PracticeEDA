@@ -1,0 +1,47 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p1",
+          "kind": "Constant",
+          "label": "p1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "missing",
+            "A"
+          ],
+          "bends": [],
+          "id": "w2"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "数字逻辑工程",
+  "nextId": 3,
+  "version": 1
+}

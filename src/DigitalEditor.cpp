@@ -22,6 +22,7 @@
 #include <wx/print.h>
 #include <wx/printdlg.h>
 #include <wx/config.h>
+#include <wx/bmpbuttn.h>
 
 namespace eda::logic {
 namespace {
@@ -60,21 +61,39 @@ enum {
     L_CIRCLE,
     L_GUIDE, L_UP, L_EDIT_DEFINITION, L_MEMORY_INITIAL, L_MEMORY_RUNTIME, L_PIN_LAYOUT,
     L_MONITOR, L_RECENT, L_TEMPLATE, L_BATCH_PNG, L_PRINT, L_PREVIEW, L_EXPORT_CIRC,
-    L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE,
+    L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE, L_DIAGNOSTICS, L_REROUTE,
     L_RECENT_FIRST = wxID_HIGHEST + 900
 };
-enum PropertyRow { P_TYPE, P_ID, P_LABEL, P_WIDTH, P_VALUE, P_MEMORY, P_STATE, P_STROKE, P_FILL,
-    P_ROTATION, P_INPUTS, P_INVERT, P_SELECT, P_INPUTWIDTH, P_SIGN, P_HIGH, P_LOW, P_PHASE,
+enum PropertyRow { P_CIRCUIT, P_ROTATION, P_WIDTH, P_INPUTS, P_SELECT, P_INPUTWIDTH, P_OUTPUTWIDTH,
+    P_SIGN, P_HIGH, P_LOW, P_PHASE,
     P_FALLING, P_MAX, P_LOAD, P_ADDR, P_MOMENTARY, P_ACTIVELOW, P_GROUPS,
-    P_OUTPUTWIDTH, P_MODE, P_ROWS, P_COLS, P_COUNT };
+    P_MODE, P_ROWS, P_COLS, P_XOR, P_LABEL, P_VALUE, P_MEMORY, P_STATE, P_STROKE, P_FILL,
+    P_TYPE, P_ID, P_INVERT, P_PARTCOUNT, P_WIRECOUNT, P_PORTCOUNT,
+    P_INPUT_INVERT_FIRST, P_COUNT = P_INPUT_INVERT_FIRST + 32 };
 const std::map<int, std::pair<std::string, int64_t>> parameterRows = {
     {P_INPUTS,{"inputs",2}}, {P_INVERT,{"invertMask",0}}, {P_SELECT,{"selectBits",1}},
     {P_INPUTWIDTH,{"inputWidth",1}}, {P_SIGN,{"signExtend",0}}, {P_HIGH,{"highTicks",1}},
     {P_LOW,{"lowTicks",1}}, {P_PHASE,{"phase",0}}, {P_FALLING,{"falling",0}},
     {P_MAX,{"counterMax",-1}}, {P_LOAD,{"loadable",0}}, {P_ADDR,{"addressBits",8}},
     {P_MOMENTARY,{"momentary",0}}, {P_ACTIVELOW,{"activeLow",0}},
-    {P_OUTPUTWIDTH,{"outputWidth",1}}, {P_MODE,{"mode",0}}, {P_ROWS,{"rows",8}}, {P_COLS,{"cols",8}}
+    {P_OUTPUTWIDTH,{"outputWidth",1}}, {P_MODE,{"mode",0}}, {P_ROWS,{"rows",8}}, {P_COLS,{"cols",8}},
+    {P_XOR,{"xorOne",0}}
 };
+const std::map<int, const char *> propertyCaptions = {
+    {P_CIRCUIT,"电路名称"}, {P_ROTATION,"方向"}, {P_WIDTH,"数据位宽"}, {P_INPUTS,"输入引脚数量"},
+    {P_SELECT,"选择位数"}, {P_INPUTWIDTH,"输入位宽"}, {P_OUTPUTWIDTH,"输出位宽"}, {P_SIGN,"符号扩展"},
+    {P_HIGH,"高电平节拍"}, {P_LOW,"低电平节拍"}, {P_PHASE,"时钟相位"}, {P_FALLING,"下降沿触发"},
+    {P_MAX,"计数上限"}, {P_LOAD,"启用装载"}, {P_ADDR,"地址位数"}, {P_MOMENTARY,"瞬时按钮"},
+    {P_ACTIVELOW,"低电平有效"}, {P_GROUPS,"总线分组"}, {P_MODE,"查找模式"}, {P_ROWS,"矩阵行数"},
+    {P_COLS,"矩阵列数"}, {P_XOR,"多输入行为"}, {P_LABEL,"标签"}, {P_VALUE,"初始值"},
+    {P_MEMORY,"存储器初值"}, {P_STATE,"当前信号"}, {P_STROKE,"线宽"}, {P_FILL,"填充"},
+    {P_TYPE,"类型"}, {P_ID,"对象 ID"}, {P_INVERT,"反相位掩码"}, {P_PARTCOUNT,"元件数量"},
+    {P_WIRECOUNT,"导线数量"}, {P_PORTCOUNT,"输入 / 输出接口"}
+};
+const std::set<int> booleanRows = {P_FILL,P_SIGN,P_FALLING,P_LOAD,P_MOMENTARY,P_ACTIVELOW};
+const std::vector<std::string> directionNames = {"右", "下", "左", "上"};
+const std::vector<std::string> finderNames = {"最低位 1", "最高位 1", "最低位 0", "最高位 0"};
+const std::vector<std::string> xorNames = {"奇数个为 1", "仅一个为 1"};
 struct Item : wxTreeItemData {
     std::string kind, circuit;
     Item(std::string k, std::string c = "") : kind(std::move(k)), circuit(std::move(c)) {}
@@ -160,14 +179,15 @@ LogicEditor::LogicEditor(wxWindow *parent)
                   {L_CIRCLE, "圆 (C)"},
                   {L_APPEARANCE, "切换电路 / 元件外观"},
                   {L_ROTATE, "顺时针旋转元件\tCtrl+R"},
-                  {L_FIT, "适合画面 (Home)"}});
-    menu("项目", {{L_NEW_CIRCUIT, "新建子电路…"},
+                  {L_REROUTE, "重排选中导线\tCtrl+Shift+R"},
+                  {L_FIT, "适合画面 (Home)"}, {L_DIAGNOSTICS,"查看 ERC 问题…\tCtrl+Shift+E"}});
+    menu("项目", {{L_NEW_CIRCUIT, "新建子电路…\tCtrl+Shift+N"},
                   {L_NEW_COMPONENT, "新建自定义元件…"},
                   {L_SAVE_COMPONENT, "保存当前电路为元件…"},
                   {L_LOAD_COMPONENT, "导入自定义元件…"},
                   {L_WRAP, "封装当前电路为子电路…"},
                   {L_RENAME, "重命名当前电路…"},
-                  {L_DEL_CIRCUIT, "删除当前子电路"}});
+                  {L_DEL_CIRCUIT, "删除当前子电路\tCtrl+Shift+Delete"}});
     bar->GetMenu(3)->AppendSeparator();
     bar->GetMenu(3)->Append(L_UP, U("返回上级实例\tAlt+Up"));
     bar->GetMenu(3)->Append(L_EDIT_DEFINITION, U("编辑当前电路定义（暂停并复位）"));
@@ -187,13 +207,14 @@ LogicEditor::LogicEditor(wxWindow *parent)
     menu("帮助", {{L_GUIDE, "操作指南"}, {L_HELP, "数字逻辑使用说明"}});
     SetMenuBar(bar);
     auto root = new wxBoxSizer(wxVERTICAL);
-    auto toolbar = new wxToolBar(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+    auto shortcuts = new wxToolBar(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
                                  wxTB_HORIZONTAL | wxTB_TEXT | wxTB_NODIVIDER);
-    toolbar->SetName("logic-actions");
-    toolbar->SetToolBitmapSize({24, 24});
+    shortcuts->SetName("logic-components");
+    shortcuts->SetToolBitmapSize({28, 28});
     auto button = [&](int id, const char *name, const char *asset) {
-        toolbar->AddTool(id, U(name), icon(asset), U(name));
-        toolbar->Bind(
+        shortcuts->AddTool(id, U(name), icon(asset), U(name));
+        shortcuts->SetToolLongHelp(id, U(asset));
+        shortcuts->Bind(
             wxEVT_TOOL,
             [this, id](wxCommandEvent &) {
                 wxCommandEvent e(wxEVT_MENU, id);
@@ -201,44 +222,21 @@ LogicEditor::LogicEditor(wxWindow *parent)
             },
             id);
     };
-    button(wxID_NEW, "新建", "New");
-    button(wxID_OPEN, "打开", "Open");
-    button(wxID_SAVE, "保存", "Save");
-    toolbar->AddSeparator();
-    button(wxID_UNDO, "撤销", "Undo");
-    button(wxID_REDO, "重做", "Redo");
-    button(wxID_COPY, "复制", "Copy");
-    button(wxID_PASTE, "粘贴", "Paste");
-    toolbar->AddSeparator();
     button(L_SELECT, "选择 S", "Select");
     button(L_WIRE, "导线 W", "Wire");
-    button(L_NODE, "节点 J", "Node");
-    button(L_FIT, "适合画面", "Fit");
-    toolbar->AddSeparator();
-    button(L_STEP, "单步 F7", "Step");
-    button(L_TICK, "时钟 F8", "Clock");
-    button(L_RUN, "运行 F5", "Run");
-    button(L_RESET, "复位", "Reset");
-    button(L_TABLE, "真值表", "Table");
-    toolbar->Realize();
-    root->Add(toolbar, 0, wxEXPAND);
-    auto shortcuts = new wxToolBar(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                                   wxTB_HORIZONTAL | wxTB_TEXT | wxTB_NODIVIDER);
-    shortcuts->SetName("logic-components");
-    shortcuts->SetToolBitmapSize({28, 28});
+    shortcuts->AddSeparator();
     for (const auto &entry : std::vector<std::pair<std::string, std::string>>{{"Input", "输入"},
                                                                               {"Output", "输出"},
-                                                                              {"Clock", "时钟"},
                                                                               {"Not", "非门"},
+                                                                              {"Buffer", "缓冲"},
                                                                               {"And", "与门"},
                                                                               {"Or", "或门"},
                                                                               {"Xor", "异或"},
                                                                               {"Nand", "与非"},
-                                                                              {"Mux", "选择器"},
-                                                                              {"Splitter", "分线器"},
-                                                                              {"DFF", "D 触发器"},
-                                                                              {"Register", "寄存器"},
-                                                                              {"LED", "LED"}}) {
+                                                                              {"Nor", "或非"},
+                                                                              {"Xnor", "同或"}}) {
+        if (entry.first == "Not")
+            shortcuts->AddSeparator();
         int id = wxWindow::NewControlId();
         auto kind = entry.first;
         shortcuts->AddTool(id, U(entry.second), icon(kind), U(pretty(kind)));
@@ -250,6 +248,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
                 setAppearance(false);
                 canvas->placing = kind;
                 canvas->subcircuit.clear();
+                canvas->selected.clear();
                 canvas->tool = "Place";
                 canvas->SetFocus();
                 rebuild(false);
@@ -269,24 +268,43 @@ LogicEditor::LogicEditor(wxWindow *parent)
                                                               {L_HELP, "Help"}})
         bar->FindItem(item.first)->SetBitmap(icon(item.second));
     auto body = new wxSplitterWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
-    auto centre = new wxSplitterWindow(body, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
-    body->SetMinimumPaneSize(190);
-    centre->SetMinimumPaneSize(270);
+    body->SetName("workspace-splitter");
+    body->SetMinimumPaneSize(FromDIP(250));
     auto left = new wxPanel(body);
-    left->SetMinSize({240, -1});
+    left->SetName("library-sidebar");
+    left->SetMinSize(FromDIP(wxSize(280, -1)));
     auto ls = new wxBoxSizer(wxVERTICAL);
-    ls->Add(new wxStaticText(left, wxID_ANY, U("项目 / 数字元件库")), 0, wxALL, 10);
+    ls->Add(new wxStaticText(left, wxID_ANY, U("项目 / 数字元件库")), 0, wxLEFT | wxTOP | wxBOTTOM, FromDIP(7));
+    auto circuitRow = new wxBoxSizer(wxHORIZONTAL);
     circuits = new wxChoice(left, wxID_ANY);
-    ls->Add(circuits, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
-    ls->Add(new wxStaticText(left, wxID_ANY, U("运行实例层次（双击进入）")), 0, wxALL, 8);
-    hierarchy = new wxTreeCtrl(left, wxID_ANY, wxDefaultPosition, {240, 150}, wxTR_DEFAULT_STYLE);
+    circuits->SetName("circuit-selector");
+    circuitRow->Add(circuits, 1, wxEXPAND | wxRIGHT, FromDIP(4));
+    newCircuitButton = new wxButton(left, L_NEW_CIRCUIT, wxEmptyString, wxDefaultPosition, FromDIP(wxSize(28, 27)));
+    newCircuitButton->SetName("new-subcircuit");
+    newCircuitButton->SetBitmap(icon("AddCircuit").GetBitmap(FromDIP(wxSize(18, 18))));
+    newCircuitButton->SetToolTip(U("新建子电路 (Ctrl+Shift+N)"));
+    deleteCircuitButton = new wxButton(left, L_DEL_CIRCUIT, wxEmptyString, wxDefaultPosition, FromDIP(wxSize(28, 27)));
+    deleteCircuitButton->SetName("delete-subcircuit");
+    deleteCircuitButton->SetBitmap(icon("DeleteCircuit").GetBitmap(FromDIP(wxSize(18, 18))));
+    deleteCircuitButton->SetToolTip(U("删除当前子电路 (Ctrl+Shift+Delete)"));
+    circuitRow->Add(newCircuitButton, 0, wxRIGHT, FromDIP(3));
+    circuitRow->Add(deleteCircuitButton, 0);
+    ls->Add(circuitRow, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(6));
+    ls->Add(new wxStaticText(left, wxID_ANY, U("实例层次 · 双击进入")), 0, wxLEFT | wxTOP, FromDIP(6));
+    hierarchy = new wxTreeCtrl(left, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(-1, 28)), wxTR_DEFAULT_STYLE);
     hierarchy->SetName("simulation-hierarchy");
-    ls->Add(hierarchy, 0, wxEXPAND | wxLEFT | wxRIGHT, 6);
+    ls->Add(hierarchy, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(6));
     search = new wxTextCtrl(left, wxID_ANY);
     search->SetHint(U("搜索元件名称或类型"));
-    ls->Add(search, 0, wxEXPAND | wxALL, 8);
-    tree =
-        new wxTreeCtrl(left, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_DEFAULT_STYLE | wxTR_HIDE_ROOT);
+    ls->Add(search, 0, wxEXPAND | wxALL, FromDIP(6));
+    auto sidebarSplit = new wxSplitterWindow(left, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    sidebarSplit->SetName("library-properties-splitter");
+    sidebarSplit->SetMinimumPaneSize(FromDIP(130));
+    auto libraryPanel = new wxPanel(sidebarSplit);
+    auto librarySizer = new wxBoxSizer(wxVERTICAL);
+    tree = new wxTreeCtrl(libraryPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                         wxTR_DEFAULT_STYLE | wxTR_HIDE_ROOT);
+    tree->SetName("component-library");
     auto images = new wxImageList(20, 20, true);
     auto addIcon = [&](const std::string &kind) {
         iconIds[kind] = images->Add(icon(kind).GetBitmap({20, 20}));
@@ -299,90 +317,126 @@ LogicEditor::LogicEditor(wxWindow *parent)
     for (const auto &item : library())
         addIcon(item.kind);
     tree->AssignImageList(images);
-    ls->Add(tree, 1, wxEXPAND | wxALL, 6);
-    left->SetSizer(ls);
-    canvas = new LogicCanvas(this, centre);
-    auto right = new wxPanel(centre);
-    right->SetMinSize({320, -1});
-    auto rs = new wxBoxSizer(wxVERTICAL);
-    selection = new wxStaticText(right, wxID_ANY, U("未选中元件"));
-    rs->Add(selection, 0, wxEXPAND | wxALL, 10);
-    properties = new wxGrid(right, wxID_ANY);
+    librarySizer->Add(tree, 1, wxEXPAND);
+    libraryPanel->SetSizer(librarySizer);
+    auto propertyPanel = new wxPanel(sidebarSplit);
+    propertyPanel->SetName("property-inspector");
+    auto propertySizer = new wxBoxSizer(wxVERTICAL);
+    selection = new wxStaticText(propertyPanel, wxID_ANY, U("电路：main"));
+    selection->SetFont(selection->GetFont().Bold());
+    propertySizer->Add(selection, 0, wxEXPAND | wxALL, FromDIP(5));
+    properties = new wxGrid(propertyPanel, wxID_ANY);
     properties->SetName("component-properties");
     properties->CreateGrid(P_COUNT, 2);
     properties->SetColLabelValue(0, U("属性"));
     properties->SetColLabelValue(1, U("值"));
     properties->SetRowLabelSize(0);
-    properties->SetColLabelSize(30);
-    properties->SetDefaultRowSize(32);
-    properties->SetColSize(0, 125);
-    properties->SetColSize(1, 170);
+    properties->SetColLabelSize(FromDIP(24));
+    properties->SetDefaultRowSize(FromDIP(24));
+    properties->SetColSize(0, FromDIP(126));
+    properties->SetColSize(1, FromDIP(155));
     properties->SetDefaultCellAlignment(wxALIGN_LEFT, wxALIGN_CENTER);
     properties->SetGridLineColour(wxColour("#cbd5e1"));
     properties->SetLabelBackgroundColour(wxColour("#eef2f7"));
     properties->DisableDragRowSize();
     properties->DisableDragColMove();
-    properties->SetMinSize({300, 220});
-    const char *captions[] = {"类型",          "对象 ID",    "名称 / 网络标签", "数据位宽 (1–32)",
-                              "输入 / 初始值", "存储器初值", "当前信号",        "图形线宽 (1–20)",
-                              "填充", "朝向 (0–3)", "输入数量", "输入反相位掩码", "选择位数",
-                              "扩展输入位宽", "符号扩展 (0/1)", "时钟高电平节拍", "时钟低电平节拍",
-                              "时钟相位", "下降沿 (0/1)", "计数上限 (-1自动)", "装载引脚 (0/1)",
-                              "地址位数", "瞬时按钮 (0/1)", "低电平有效 (0/1)", "总线分组",
-                              "输出位宽", "查找模式 (0–3)", "矩阵行数", "矩阵列数"};
+    properties->SetMinSize(FromDIP(wxSize(265, 140)));
     for (int row = 0; row < P_COUNT; ++row) {
-        properties->SetCellValue(row, 0, U(captions[row]));
+        auto caption = propertyCaptions.find(row);
+        properties->SetCellValue(row, 0, caption == propertyCaptions.end() ? wxString{} : U(caption->second));
         properties->SetReadOnly(row, 0);
-        properties->SetCellBackgroundColour(row, 0, wxColour("#f1f5f9"));
+        properties->SetCellBackgroundColour(row, 0, wxColour("#f7f9fc"));
+        if (booleanRows.count(row) || row >= P_INPUT_INVERT_FIRST) {
+            properties->SetCellEditor(row, 1, new wxGridCellBoolEditor());
+            properties->SetCellRenderer(row, 1, new wxGridCellBoolRenderer());
+        }
     }
-    properties->SetCellEditor(P_FILL, 1, new wxGridCellBoolEditor());
-    properties->SetCellRenderer(P_FILL, 1, new wxGridCellBoolRenderer());
-    properties->SetToolTip(
-        U("双击值或按 F2 编辑，回车确认。数值支持十进制和 0x；存储器初值以空格分隔，最多 256 字。"));
+    auto choices = [&](int row, const std::vector<std::string> &values) {
+        wxArrayString items;
+        for (const auto &value : values)
+            items.Add(U(value));
+        properties->SetCellEditor(row, 1, new wxGridCellChoiceEditor(items));
+    };
+    choices(P_ROTATION, directionNames);
+    choices(P_MODE, finderNames);
+    choices(P_XOR, xorNames);
+    properties->SetToolTip(U("双击值或按 F2 编辑，回车确认。方向使用下拉选项；勾选输入反相。数值支持十进制和 0x。"));
     properties->Bind(wxEVT_GRID_CELL_CHANGED, [this](wxGridEvent &e) {
         if (syncingProperties)
             return;
         try {
             apply();
+            propertyHint->SetLabel(wxEmptyString);
             CallAfter([this] { inspect(); });
         } catch (const std::exception &error) {
             properties->SetCellValue(e.GetRow(), e.GetCol(), e.GetString());
-            diagnosticDetail->ChangeValue(U("属性未修改：" + std::string(error.what())));
+            propertyHint->SetLabel(U("未修改：" + std::string(error.what())));
+            propertyHint->Wrap(std::max(100, properties->GetClientSize().x));
+            propertyHint->GetParent()->Layout();
         }
     });
     properties->Bind(wxEVT_SIZE, [this](wxSizeEvent &e) {
-        properties->SetColSize(1, std::max(150, properties->GetClientSize().x - 145));
+        const int available = properties->GetClientSize().x - FromDIP(4);
+        const int first = std::min(FromDIP(132), available / 2);
+        properties->SetColSize(0, std::max(FromDIP(100), first));
+        properties->SetColSize(1, std::max(FromDIP(90), available - first));
         e.Skip();
     });
-    rs->Add(properties, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
-    diagnosticSummary = new wxStaticText(right, wxID_ANY, U("连接检查"));
-    rs->Add(diagnosticSummary, 0, wxEXPAND | wxALL, 10);
-    diagnostics = new wxListBox(right, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxLB_HSCROLL);
-    diagnostics->SetName("connection-diagnostics");
-    diagnostics->SetMinSize({300, 140});
-    diagnostics->SetToolTip(U("单击查看完整说明，双击定位画布中的元件或导线"));
-    rs->Add(diagnostics, 1, wxEXPAND | wxLEFT | wxRIGHT, 8);
-    diagnosticDetail = new wxTextCtrl(right, wxID_ANY, "", wxDefaultPosition, {300, 95},
-                                      wxTE_MULTILINE | wxTE_READONLY | wxTE_WORDWRAP);
-    diagnosticDetail->SetName("connection-diagnostic-detail");
-    rs->Add(diagnosticDetail, 0, wxEXPAND | wxALL, 8);
-    right->SetSizer(rs);
-    centre->SetSashGravity(1);
-    centre->SplitVertically(canvas, right, -340);
-    body->SplitVertically(left, centre, 265);
+    propertySizer->Add(properties, 1, wxEXPAND);
+    propertyHint = new wxStaticText(propertyPanel, wxID_ANY, wxEmptyString);
+    propertyHint->SetForegroundColour(wxColour("#c53242"));
+    propertySizer->Add(propertyHint, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(4));
+    propertyPanel->SetSizer(propertySizer);
+    sidebarSplit->SetSashGravity(.52);
+    sidebarSplit->SplitHorizontally(libraryPanel, propertyPanel, FromDIP(310));
+    ls->Add(sidebarSplit, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(5));
+    left->SetSizer(ls);
+    auto canvasColumn = new wxPanel(body);
+    auto canvasSizer = new wxBoxSizer(wxVERTICAL);
     auto navigationBar = new wxBoxSizer(wxHORIZONTAL);
-    auto up = new wxButton(this, L_UP, U("↑ 返回上级"));
-    breadcrumbs = new wxChoice(this, wxID_ANY);
+    navigateUpButton = new wxButton(canvasColumn, L_UP, U("↑ 返回上级"));
+    breadcrumbs = new wxChoice(canvasColumn, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(290, -1)));
     breadcrumbs->SetName("instance-breadcrumbs");
-    auto editDefinitionButton = new wxButton(this, L_EDIT_DEFINITION, U("编辑定义（复位）"));
-    navigationBar->Add(up, 0, wxRIGHT, 8);
-    navigationBar->Add(breadcrumbs, 1, wxEXPAND);
-    navigationBar->Add(editDefinitionButton, 0, wxLEFT, 8);
-    root->Add(navigationBar, 0, wxEXPAND | wxALL, 8);
+    breadcrumbs->SetMaxSize(FromDIP(wxSize(490, -1)));
+    editDefinitionButton = new wxButton(canvasColumn, L_EDIT_DEFINITION, U("编辑定义（复位）"));
+    navigationBar->Add(navigateUpButton, 0, wxRIGHT, FromDIP(5));
+    navigationBar->Add(breadcrumbs, 0);
+    navigationBar->Add(editDefinitionButton, 0, wxLEFT, FromDIP(5));
+    canvasSizer->Add(navigationBar, 0, wxEXPAND | wxALL, FromDIP(5));
+    canvas = new LogicCanvas(this, canvasColumn);
+    canvas->SetName("logic-canvas");
+    canvasSizer->Add(canvas, 1, wxEXPAND);
+    canvasColumn->SetSizer(canvasSizer);
+    body->SetSashGravity(0);
+    body->SplitVertically(left, canvasColumn, FromDIP(310));
     root->Add(body, 1, wxEXPAND);
     status = new wxStaticText(this, wxID_ANY, "");
-    root->Add(status, 0, wxEXPAND | wxALL, 8);
+    root->Add(status, 0, wxEXPAND | wxALL, FromDIP(5));
     SetSizer(root);
+    CallAfter([sidebarSplit] {
+        sidebarSplit->SetSashPosition(int(sidebarSplit->GetClientSize().y * .56));
+    });
+
+    // 连接诊断只在需要时打开，画布不再为固定 ERC 面板预留空间。
+    diagnosticsWindow = new wxDialog(this, wxID_ANY, U("ERC 问题"), wxDefaultPosition, FromDIP(wxSize(540, 410)),
+                                    wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+    diagnosticsWindow->SetName("erc-problems-window");
+    auto diagnosticSizer = new wxBoxSizer(wxVERTICAL);
+    diagnosticSummary = new wxStaticText(diagnosticsWindow, wxID_ANY, U("ERC 问题"));
+    diagnosticSizer->Add(diagnosticSummary, 0, wxEXPAND | wxALL, FromDIP(8));
+    diagnostics = new wxListBox(diagnosticsWindow, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxLB_HSCROLL);
+    diagnostics->SetName("connection-diagnostics");
+    diagnostics->SetToolTip(U("单击问题即可缩放定位并高亮相关对象"));
+    diagnosticSizer->Add(diagnostics, 1, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(8));
+    diagnosticDetail = new wxTextCtrl(diagnosticsWindow, wxID_ANY, wxEmptyString, wxDefaultPosition,
+                                    FromDIP(wxSize(-1, 140)), wxTE_MULTILINE | wxTE_READONLY | wxTE_WORDWRAP);
+    diagnosticDetail->SetName("connection-diagnostic-detail");
+    diagnosticSizer->Add(diagnosticDetail, 0, wxEXPAND | wxALL, FromDIP(8));
+    diagnosticsWindow->SetSizer(diagnosticSizer);
+    diagnosticsWindow->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent &e) {
+        if (e.CanVeto()) { diagnosticsWindow->Hide(); e.Veto(); }
+        else e.Skip();
+    });
     auto bind = [&](int id, std::function<void()> fn) {
         Bind(
             wxEVT_MENU,
@@ -667,34 +721,27 @@ LogicEditor::LogicEditor(wxWindow *parent)
         rebuild(true,true); canvas->fit();
     });
     bind(L_NEW_CIRCUIT, [this] { newCircuit(); });
+    bind(L_DIAGNOSTICS, [this] { openDiagnostics(); });
+    bind(L_REROUTE, [this] { rerouteSelected(); });
+    for (int command : {L_NEW_CIRCUIT, L_DEL_CIRCUIT})
+        Bind(wxEVT_BUTTON, [this, command](wxCommandEvent &) {
+            wxCommandEvent event(wxEVT_MENU, command);
+            GetEventHandler()->ProcessEvent(event);
+        }, command);
     bind(L_NEW_COMPONENT, [this] { newComponent(); });
     bind(L_SAVE_COMPONENT, [this] { saveComponent(); });
     bind(L_LOAD_COMPONENT, [this] { loadComponent(); });
     bind(L_NETLIST, [this] { exportNetlist(); });
     bind(L_WRAP, [this] { encapsulate(); });
     bind(L_RENAME, [this] { renameCircuit(); });
-    bind(L_DEL_CIRCUIT, [this] {
-        if (current == history.project.main)
-            throw std::runtime_error("不能删除主电路");
-        for (auto &c : history.project.circuits)
-            for (auto &p : c.parts)
-                if (p.kind == "Subcircuit" && p.circuit == current)
-                    throw std::runtime_error("该子电路仍被实例引用");
-        change([&] {
-            auto name = current;
-            auto &cs = history.project.circuits;
-            cs.erase(std::remove_if(cs.begin(), cs.end(), [&](auto &c) { return c.name == name; }), cs.end());
-            current = history.project.main;
-            canvas->selected.clear();
-        });
-    });
+    bind(L_DEL_CIRCUIT, [this] { deleteCircuit(); });
     bind(L_HELP, [this] {
         showReport(
             "数字逻辑使用说明",
              "1. 选择左侧元件，在画布单击放置，或从库拖入。选择工具下拖动元件，导线跟随引脚。\n"
             "2. W 连线：点击引脚开始，空白处设置拐点，点击目标引脚结束。双击空白可结束到节点。\n"
             "3. 点击已有导线可创建分支；交叉不自动连接。J 创建节点；选中节点可设置网络标签。\n"
-            "4. 双击输入/按钮切换；多位值在右侧属性表格编辑。F7 推进一个事件时刻，F8 翻转时钟"
+            "4. 双击输入/按钮切换；多位值在左侧属性表格编辑。F7 推进一个事件时刻，F8 翻转时钟"
              "（基础节拍），F5 运行/暂停；仿真菜单可一次推进指定数量的基础节拍。\n"
             "5. 项目菜单新建子电路，用输入/输出引脚定义接口；左侧子电路库放置实例，双击进入。\n"
             "   封装功能将当前电路的副本保存为子电路定义；每个实例的寄存器、RAM 状态独立。\n"
@@ -715,7 +762,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
              "12. 编辑元件外观：围绕绿色接口绘制符号，可直接拖动接口，或通过项目菜单精确输入坐标。\n"
              "14. 双击实例进入真实运行态，返回上级不复位。运行态属性/接口输入只读，内部按钮只影响当前实例。\n"
              "15. 运行内存只读查看；初值编辑支持 raw HEX 文件。信号监测可选择输出并连续记录 CSV。\n"
-            "13. S 选择后拖动图形或控制点；右侧属性面板修改线宽、填充。Shift 约束，Esc 取消。");
+            "13. S 选择后拖动图形或控制点；左侧属性面板修改线宽、填充。Shift 约束，Esc 取消。");
     });
     search->Bind(wxEVT_TEXT, [this](wxCommandEvent &) { populate(); });
     breadcrumbs->Bind(wxEVT_CHOICE, [this](wxCommandEvent &e) {
@@ -749,6 +796,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
         setAppearance(false);
         canvas->placing = item->kind;
         canvas->subcircuit = item->circuit;
+        canvas->selected.clear();
         canvas->tool =
             (item->kind == "Select" || item->kind == "Wire" || item->kind == "Node") ? item->kind : "Place";
         canvas->SetFocus();
@@ -763,6 +811,8 @@ LogicEditor::LogicEditor(wxWindow *parent)
         canvas->placing = item->kind;
         canvas->subcircuit = item->circuit;
         canvas->tool = "Place";
+        canvas->selected.clear();
+        inspect();
         e.Allow();
     });
     tree->Bind(wxEVT_TREE_END_DRAG, [this](wxTreeEvent &e) {
@@ -774,9 +824,15 @@ LogicEditor::LogicEditor(wxWindow *parent)
             fail(x);
         }
     });
-    diagnostics->Bind(wxEVT_LISTBOX, [this](wxCommandEvent &e) { showDiagnostic(e.GetSelection(), false); });
+    diagnostics->Bind(wxEVT_LISTBOX, [this](wxCommandEvent &e) {
+        const auto row = e.GetSelection();
+        if (row >= 0 && size_t(row) < diagnosticOrder.size()) showDiagnostic(diagnosticOrder[size_t(row)], true);
+    });
     diagnostics->Bind(wxEVT_LISTBOX_DCLICK,
-                      [this](wxCommandEvent &e) { showDiagnostic(e.GetSelection(), true); });
+                      [this](wxCommandEvent &e) {
+                          const auto row = e.GetSelection();
+                          if (row >= 0 && size_t(row) < diagnosticOrder.size()) showDiagnostic(diagnosticOrder[size_t(row)], true);
+                      });
     Bind(wxEVT_TIMER, [this](wxTimerEvent &) {
         try {
             tick();
@@ -881,8 +937,14 @@ void LogicEditor::refreshHierarchy() {
         }
     };
     add(root,simulationRoot,"",0); hierarchy->Expand(root); hierarchy->Thaw();
+    const int height = FromDIP(int(std::clamp<size_t>((count + 1) * 23 + 4, 28, 92)));
+    hierarchy->SetMinSize({-1, height});
+    hierarchy->SetMaxSize({-1, height});
+    hierarchy->GetParent()->Layout();
 }
 void LogicEditor::rebuild(bool reset, bool lib) {
+    canvas->wireDisplayDirty = true;
+    canvas->previewDirty = true;
     if(!scope.empty() && !reset) { canvas->tool="Select"; canvas->appearance=false; }
     if (reset) {
         stop();
@@ -902,10 +964,17 @@ void LogicEditor::rebuild(bool reset, bool lib) {
     }
     breadcrumbs->Clear();
     for(const auto &level:navigation)
-        breadcrumbs->Append(U((level.scope.empty()?level.circuit:level.scope)+"  /  "+level.circuit));
-    breadcrumbs->Append(U((scope.empty()?current:scope)+"  /  "+current+
-                          (scope.empty()?" · 定义编辑":" · 运行实例")));
+        breadcrumbs->Append(U(level.scope.empty() ? level.circuit : level.scope + " / " + level.circuit));
+    breadcrumbs->Append(U(scope.empty() ? current + " · 定义编辑" : scope + " / " + current + " · 运行实例"));
     breadcrumbs->SetSelection(int(navigation.size()));
+    navigateUpButton->Enable(!navigation.empty());
+    editDefinitionButton->Show(!scope.empty());
+    newCircuitButton->Enable(scope.empty());
+    deleteCircuitButton->Enable(canDeleteCircuit());
+    GetMenuBar()->FindItem(L_NEW_CIRCUIT)->Enable(scope.empty());
+    GetMenuBar()->FindItem(L_DEL_CIRCUIT)->Enable(canDeleteCircuit());
+    GetMenuBar()->FindItem(L_REROUTE)->Enable(scope.empty());
+    breadcrumbs->GetParent()->Layout();
     SetTitle(U(std::string(history.dirty() ? "* " : "") + history.project.name + " — " + current +
                 (scope.empty()?" · 定义编辑":" · 实例 "+scope) + " · PracticeEDA 数字逻辑"));
     refreshDiagnostics();
@@ -916,6 +985,7 @@ void LogicEditor::rebuild(bool reset, bool lib) {
           std::to_string(simulator->time()) + "   待处理事件=" + std::to_string(simulator->pending()) +
           "   |   元件=" + std::to_string(circuit().parts.size()) +
           "   导线=" + std::to_string(circuit().wires.size())));
+    if(!routingNotice.empty())status->SetLabel(status->GetLabel()+U("   |   "+routingNotice));
     GetMenuBar()
         ->FindItem(L_APPEARANCE)
         ->SetItemLabel(U(canvas->appearance ? "返回电路编辑" : "编辑元件外观"));
@@ -929,13 +999,15 @@ void LogicEditor::rebuild(bool reset, bool lib) {
 void LogicEditor::refreshDiagnostics() {
     std::optional<Issue> picked;
     int oldIndex = diagnostics->GetSelection();
-    if (oldIndex >= 0 && size_t(oldIndex) < issues.size())
-        picked = issues[oldIndex];
+    if (oldIndex >= 0 && size_t(oldIndex) < diagnosticOrder.size() &&
+        size_t(diagnosticOrder[size_t(oldIndex)]) < issues.size())
+        picked = issues[size_t(diagnosticOrder[size_t(oldIndex)])];
     issues = circDiagnostics(circuit());
     auto simulationIssues = simulator->issues();
     issues.insert(issues.end(), simulationIssues.begin(), simulationIssues.end());
     diagnostics->Freeze();
     diagnostics->Clear();
+    diagnosticOrder.clear();
     int errors = 0, warnings = 0, notes = 0, selectedIndex = -1;
     for (size_t index = 0; index < issues.size(); ++index) {
         const auto &issue = issues[index];
@@ -949,16 +1021,16 @@ void LogicEditor::refreshDiagnostics() {
         else
             ++notes;
         diagnostics->Append(U("[" + severity + "] " + issue.object + " · " + issue.message));
+        diagnosticOrder.push_back(int(index));
         if (picked && picked->object == issue.object && picked->message == issue.message &&
             picked->severity == issue.severity)
             selectedIndex = int(index);
     }
     if (issues.empty()) {
-        diagnostics->Append(U("检查通过 · 未发现连接问题"));
-        diagnosticSummary->SetLabel(U("连接检查 · 通过"));
-        diagnosticDetail->ChangeValue(U("当前电路未发现位宽冲突、悬空输入或信号错误。"));
+        diagnosticSummary->SetLabel(U("ERC · 当前检查范围内未发现问题"));
+        diagnosticDetail->ChangeValue(U("目前检查位宽和仿真连接状态；此列表不表示完整静态 ERC 已通过。"));
     } else {
-        diagnosticSummary->SetLabel(U("连接检查 · " + std::to_string(errors) + " 错误 / " +
+        diagnosticSummary->SetLabel(U("ERC · " + std::to_string(errors) + " 错误 / " +
                                       std::to_string(warnings) + " 警告 / " + std::to_string(notes) +
                                       " 提示"));
         if (selectedIndex < 0)
@@ -973,16 +1045,7 @@ void LogicEditor::showDiagnostic(int index, bool locate) {
     if (index < 0 || size_t(index) >= issues.size())
         return;
     const auto issue = issues[index];
-    std::string detail = "对象：" + issue.object + "\n" + issue.message;
-    if (issue.message.find("位宽") != std::string::npos)
-        detail += "\n请使连接两端位宽一致，或使用分线器 / 合线器。";
-    else if (issue.message.find("高阻") != std::string::npos)
-        detail += "\n请检查输入是否接到有效输出，以及三态缓冲器是否使能。";
-    else if (issue.message.find("冲突") != std::string::npos)
-        detail += "\n请检查多个输出是否驱动同一网络，以及除零等非法运算。";
-    else if (issue.message.find("未知") != std::string::npos)
-        detail += "\n请沿输入方向检查未知信号来源及存储器初值。";
-    diagnosticDetail->ChangeValue(U(detail));
+    diagnosticDetail->ChangeValue(U(diagnosticText(issue)));
     if (!locate)
         return;
     auto id = issue.object;
@@ -999,15 +1062,25 @@ void LogicEditor::showDiagnostic(int index, bool locate) {
         if(!navigation.empty()) navigateTo(0);
     }
     std::optional<Point> at;
+    Point extent{110, 90};
     auto find = [&] {
-        if (auto part = circuit().part(id))
+        if (auto part = circuit().part(id)) {
             at = part->at;
+            const auto body = partSize(history.project, *part);
+            extent = part->rotation % 2 ? Point{body.y, body.x} : body;
+        }
         for (const auto &node : circuit().nodes)
             if (node.id == id)
                 at = node.at;
         for (const auto &wire : circuit().wires)
-            if (wire.id == id)
-                at = endpoint(history.project, circuit(), wire.a);
+            if (wire.id == id) {
+                const auto points = wirePoints(history.project, circuit(), wire);
+                Point lo = points.front(), hi = lo;
+                for (auto p : points) { lo.x = std::min(lo.x, p.x); lo.y = std::min(lo.y, p.y);
+                                       hi.x = std::max(hi.x, p.x); hi.y = std::max(hi.y, p.y); }
+                at = (lo + hi) * .5;
+                extent = hi - lo;
+            }
     };
     find();
     if (!at && id.find('/') != std::string::npos) {
@@ -1021,13 +1094,29 @@ void LogicEditor::showDiagnostic(int index, bool locate) {
     canvas->tool = "Select";
     canvas->selected = {id};
     auto size = canvas->GetClientSize();
+    canvas->view.zoom = std::clamp(std::min(size.x * .65 / (extent.x + 120), size.y * .6 / (extent.y + 100)), .3, 2.0);
     canvas->view.offset = Point{size.x / 2.0, size.y / 2.0} - *at * canvas->view.zoom;
     inspect();
     canvas->Refresh();
 }
+Part LogicEditor::placementPart() const {
+    const auto key = canvas->placing + ":" + canvas->subcircuit;
+    auto found = toolDefaults.find(key);
+    Part part = found == toolDefaults.end() ? Part{} : found->second;
+    part.kind = canvas->placing;
+    part.circuit = canvas->subcircuit;
+    if (found == toolDefaults.end() &&
+        (part.kind == "Splitter" || part.kind == "Joiner" || part.kind == "Extender" ||
+         part.kind == "Hex" || part.kind == "RAM" || part.kind == "ROM"))
+        part.width = 8;
+    return part;
+}
 void LogicEditor::inspect() {
-    // 仿真 tick 绝不能覆盖正在进行的单元格编辑。
-    if (properties->IsCellEditControlEnabled() && inspectedSelection == canvas->selected)
+    const bool templateMode = canvas->tool == "Place" && scope.empty();
+    const auto context = current + "|" + scope + "|" + canvas->tool +
+                         (templateMode ? "|" + canvas->placing + ":" + canvas->subcircuit : "");
+    if (properties->IsCellEditControlEnabled() && inspectedSelection == canvas->selected &&
+        inspectedContext == context)
         return;
     if (properties->IsCellEditControlEnabled()) {
         syncingProperties = true;
@@ -1036,110 +1125,147 @@ void LogicEditor::inspect() {
         syncingProperties = false;
     }
     inspectedSelection = canvas->selected;
+    inspectedContext = context;
     properties->BeginBatch();
     for (int row = 0; row < P_COUNT; ++row) {
         properties->SetCellValue(row, 1, "");
         properties->SetReadOnly(row, 1);
         properties->SetCellBackgroundColour(row, 1, wxColour("#f1f5f9"));
         properties->HideRow(row);
+        auto caption = propertyCaptions.find(row);
+        if (caption != propertyCaptions.end())
+            properties->SetCellValue(row, 0, U(caption->second));
     }
-    auto set = [&](int row, const std::string &v, bool editable = false) {
+    auto set = [&](int row, const std::string &value, bool editable = false) {
         properties->ShowRow(row);
-        properties->SetCellValue(row, 1, U(v));
+        properties->SetCellValue(row, 1, U(value));
         properties->SetReadOnly(row, 1, !editable);
         properties->SetCellBackgroundColour(row, 1, wxColour(editable ? "#ffffff" : "#f1f5f9"));
     };
-    selection->SetLabel(U("选中 " + std::to_string(canvas->selected.size()) + " 个对象"));
-    if (canvas->selected.empty() || canvas->selected.size() > 1) {
+    auto templatePart = templateMode ? placementPart() : Part{};
+    const Part *part = templateMode ? &templatePart :
+        canvas->selected.size() == 1 ? circuit().part(*canvas->selected.begin()) : nullptr;
+    if (part) {
+        const auto &p = *part;
+        const auto &kind = p.kind;
+        selection->SetLabel(U((templateMode ? "工具：" : "元件：") + pretty(kind)));
+        selection->SetToolTip(U(templateMode ? "先设置属性，再在画布放置一次。" : "对象 ID：" + p.id));
+        set(P_LABEL, p.label, true);
+        if (kind != "Text") {
+            set(P_ROTATION, directionNames[size_t(p.rotation)], true);
+            const bool configurable = kind != "Subcircuit" && kind != "Clock" &&
+                                      kind != "Decoder" && kind != "Encoder";
+            set(P_WIDTH, std::to_string(p.width), configurable);
+        }
+        auto param = [&](int row) {
+            const auto &spec = parameterRows.at(row);
+            const auto value = parameter(p, spec.first, spec.second);
+            if (row == P_MODE)
+                set(row, finderNames[size_t(value)], true);
+            else if (row == P_XOR)
+                set(row, xorNames[size_t(value)], true);
+            else
+                set(row, booleanRows.count(row) ? (value ? "1" : "") : std::to_string(value), true);
+        };
+        if (kind == "And" || kind == "Or" || kind == "Xor" || kind == "Nand" || kind == "Nor" || kind == "Xnor") {
+            param(P_INPUTS);
+            const int count = int(parameter(p, "inputs", 2));
+            const auto mask = uint32_t(parameter(p, "invertMask", 0));
+            for (int index = 0; index < count; ++index) {
+                const int row = P_INPUT_INVERT_FIRST + index;
+                const auto pin = index == 0 ? "A" : index == 1 ? "B" : "I" + std::to_string(index);
+                properties->SetCellValue(row, 0, U("反相输入 " + std::to_string(index + 1) + " (" + pin + ")"));
+                set(row, mask & (uint32_t(1) << index) ? "1" : "", true);
+            }
+            if (kind == "Xor" || kind == "Xnor")
+                param(P_XOR);
+        }
+        if (kind == "Mux" || kind == "Demux" || kind == "Decoder" || kind == "Encoder" || kind == "BitSelector") param(P_SELECT);
+        if (kind == "BitSelector") param(P_OUTPUTWIDTH);
+        if (kind == "BitFinder") param(P_MODE);
+        if (kind == "LEDMatrix") { param(P_ROWS); param(P_COLS); }
+        if (kind == "LEDMatrix" || kind == "SevenSegment") param(P_ACTIVELOW);
+        if (kind == "Extender") { param(P_INPUTWIDTH); param(P_SIGN); }
+        if (kind == "Clock") { param(P_HIGH); param(P_LOW); param(P_PHASE); }
+        if (kind == "DFF" || kind == "TFF" || kind == "JKFF" || kind == "SRFF" || kind == "Register" ||
+            kind == "Counter" || kind == "ShiftRegister" || kind == "RAM" || kind == "Random") param(P_FALLING);
+        if (kind == "Counter") { param(P_MAX); param(P_LOAD); }
+        if (kind == "RAM" || kind == "ROM") param(P_ADDR);
+        if (kind == "Button") { param(P_MOMENTARY); param(P_ACTIVELOW); }
+        if (kind == "Transistor") param(P_ACTIVELOW);
+        if (kind == "Splitter" || kind == "Joiner") {
+            std::ostringstream groups;
+            for (size_t group = 0; group < p.bitGroups.size(); ++group) {
+                if (group) groups << ';';
+                for (size_t bit = 0; bit < p.bitGroups[group].size(); ++bit) {
+                    if (bit) groups << ',';
+                    groups << p.bitGroups[group][bit];
+                }
+            }
+            set(P_GROUPS, groups.str(), true);
+        }
+        if (kind == "Input" || kind == "Button" || kind == "Constant" || kind == "Clock" || kind == "DFF" ||
+            kind == "TFF" || kind == "JKFF" || kind == "SRFF" || kind == "Register" ||
+            kind == "Counter" || kind == "ShiftRegister") {
+            properties->SetCellValue(P_VALUE, 0, U(kind == "Input" ? "输入值" : kind == "Constant" ? "常量值" : "初始值"));
+            set(P_VALUE, std::to_string(p.value), true);
+        }
+        if (kind == "RAM" || kind == "ROM") {
+            std::ostringstream words;
+            for (auto value : p.data) words << value << ' ';
+            set(P_MEMORY, words.str(), true);
+        }
+        if (!templateMode) {
+            const auto pins = ports(history.project, p);
+            if (!pins.empty()) {
+                auto pin = std::find_if(pins.begin(), pins.end(), [](const Port &port) { return port.output; });
+                if (pin == pins.end()) pin = pins.begin();
+                set(P_STATE, read({p.id, pin->id}).text());
+            }
+        }
+    } else if (canvas->selected.empty() && !canvas->appearance && !shapeKind(canvas->tool)) {
+        selection->SetLabel(U("电路：" + current));
+        selection->SetToolTip(wxEmptyString);
+        set(P_CIRCUIT, current, true);
+        set(P_PARTCOUNT, std::to_string(circuit().parts.size()));
+        set(P_WIRECOUNT, std::to_string(circuit().wires.size()));
+        size_t inputs = 0, outputs = 0;
+        for (const auto &p : circuit().parts) {
+            if (p.kind == "Input") ++inputs;
+            if (p.kind == "Output") ++outputs;
+        }
+        set(P_PORTCOUNT, std::to_string(inputs) + " / " + std::to_string(outputs));
+    } else if (canvas->selected.size() == 1) {
+        const auto id = *canvas->selected.begin();
+        for (const auto &node : circuit().nodes)
+            if (node.id == id) {
+                selection->SetLabel(U("网络节点"));
+                properties->SetCellValue(P_LABEL, 0, U("网络标签"));
+                set(P_LABEL, node.label, true);
+                set(P_STATE, read({id, ""}).text());
+            }
+        for (const auto &wire : circuit().wires)
+            if (wire.id == id) {
+                selection->SetLabel(U("导线 / 总线"));
+                set(P_STATE, read({id, ""}).text());
+            }
+        for (const auto &shape : circuit().shapes)
+            if (shape.id == id) {
+                selection->SetLabel(U("图形：" + shape.kind));
+                set(P_STROKE, std::to_string(int(shape.stroke)), true);
+                set(P_FILL, shape.filled ? "1" : "", true);
+                drawingStroke = int(shape.stroke);
+                drawingFilled = shape.filled;
+            }
+    } else {
+        selection->SetLabel(U(canvas->selected.empty() ? "绘图属性" :
+                              "已选择 " + std::to_string(canvas->selected.size()) + " 个对象"));
         set(P_STROKE, std::to_string(drawingStroke), true);
         set(P_FILL, drawingFilled ? "1" : "", true);
-        if (canvas->selected.empty())
-            selection->SetLabel(U("元件属性 · 选择对象查看 / 编辑"));
-    } else {
-        const auto id = *canvas->selected.begin();
-        set(P_ID, id);
-        if (auto p = circuit().part(id)) {
-            selection->SetLabel(U("元件属性 · " + pretty(p->kind)));
-            set(P_TYPE, pretty(p->kind));
-            set(P_LABEL, p->label, true);
-            bool configurable = p->kind != "Subcircuit" && p->kind != "Text" && p->kind != "Clock" &&
-                                p->kind != "Decoder" && p->kind != "Encoder";
-            if (p->kind != "Text")
-                set(P_WIDTH, std::to_string(p->width), configurable);
-            if(p->kind!="Text") set(P_ROTATION,std::to_string(p->rotation),true);
-            auto param=[&](int row) { auto spec=parameterRows.at(row);
-                set(row,std::to_string(parameter(*p,spec.first,spec.second)),true); };
-            const auto &kind=p->kind;
-            if(kind=="And"||kind=="Or"||kind=="Xor"||kind=="Nand"||kind=="Nor"||kind=="Xnor") {
-                param(P_INPUTS); param(P_INVERT);
-            }
-            if(kind=="Mux"||kind=="Demux"||kind=="Decoder"||kind=="Encoder"||kind=="BitSelector") param(P_SELECT);
-            if(kind=="BitSelector") param(P_OUTPUTWIDTH);
-            if(kind=="BitFinder") param(P_MODE);
-            if(kind=="LEDMatrix") { param(P_ROWS); param(P_COLS); }
-            if(kind=="LEDMatrix"||kind=="SevenSegment") param(P_ACTIVELOW);
-            if(kind=="Extender") { param(P_INPUTWIDTH); param(P_SIGN); }
-            if(kind=="Clock") { param(P_HIGH); param(P_LOW); param(P_PHASE); }
-            if(kind=="DFF"||kind=="TFF"||kind=="JKFF"||kind=="SRFF"||kind=="Register"||
-               kind=="Counter"||kind=="ShiftRegister"||kind=="RAM"||kind=="Random") param(P_FALLING);
-            if(kind=="Counter") { param(P_MAX); param(P_LOAD); }
-            if(kind=="RAM"||kind=="ROM") param(P_ADDR);
-            if(kind=="Button") { param(P_MOMENTARY); param(P_ACTIVELOW); }
-            if(kind=="Transistor") param(P_ACTIVELOW);
-            if(kind=="Splitter"||kind=="Joiner") {
-                std::ostringstream groups;
-                for(size_t group=0;group<p->bitGroups.size();++group) {
-                    if(group) groups << ';';
-                    for(size_t bit=0;bit<p->bitGroups[group].size();++bit) {
-                        if(bit) groups << ','; groups << p->bitGroups[group][bit];
-                    }
-                }
-                set(P_GROUPS,groups.str(),true);
-            }
-            bool sourceValue = p->kind == "Input" || p->kind == "Button" || p->kind == "Constant" ||
-                               p->kind == "Clock" || p->kind == "DFF" || p->kind == "TFF" ||
-                               p->kind == "JKFF" || p->kind == "SRFF" || p->kind == "Register" ||
-                               p->kind == "Counter" || p->kind == "ShiftRegister";
-            if (sourceValue)
-                set(P_VALUE, std::to_string(p->value), true);
-            if (p->kind == "RAM" || p->kind == "ROM") {
-                std::ostringstream words;
-                for (auto n : p->data)
-                    words << n << ' ';
-                set(P_MEMORY, words.str(), true);
-            }
-            auto pins = ports(history.project, *p);
-            if (!pins.empty()) {
-                auto pin = std::find_if(pins.begin(), pins.end(), [](const Port &q) { return q.output; });
-                if (pin == pins.end())
-                    pin = pins.begin();
-                set(P_STATE, read({id, pin->id}).text());
-            }
-        } else {
-            for (const auto &n : circuit().nodes)
-                if (n.id == id) {
-                    set(P_TYPE, "节点");
-                    set(P_LABEL, n.label, true);
-                    set(P_STATE, read({id, ""}).text());
-                }
-            for (const auto &w : circuit().wires)
-                if (w.id == id) {
-                    set(P_TYPE, "导线 / 总线");
-                    set(P_STATE, read({id, ""}).text());
-                }
-            for (const auto &s : circuit().shapes)
-                if (s.id == id) {
-                    set(P_TYPE, s.kind);
-                    set(P_STROKE, std::to_string(int(s.stroke)), true);
-                    set(P_FILL, s.filled ? "1" : "", true);
-                    drawingStroke = int(s.stroke);
-                    drawingFilled = s.filled;
-                }
-        }
     }
-    if(!scope.empty()) {
-        for(int row=0;row<P_COUNT;++row) properties->SetReadOnly(row,1);
-        selection->SetLabel(selection->GetLabel()+U(" · 运行实例只读"));
+    if (!scope.empty()) {
+        for (int row = 0; row < P_COUNT; ++row) properties->SetReadOnly(row, 1);
+        selection->SetLabel(selection->GetLabel() + U(" · 实例只读"));
     }
     properties->EndBatch();
 }
@@ -1156,12 +1282,14 @@ void LogicEditor::change(const std::function<void()> &action) {
     try {
         action();
         history.project.validate();
+        const auto routing = rerouteChangedGeometry(history.project, before);
         // 先编译成功，再提交撤销记录。无效参数/断线不能破坏旧运行态。
         auto candidate=std::make_unique<Simulator>(history.project,current);
         if(traceFile)candidate->setTraceSink([this](const Trace &event){ writeTrace(event); });
         candidate->settle();
         history.commit(before);
         simulator=std::move(candidate);simulationRoot=current;navigation.clear();scope.clear();hasTable=false;
+        routingResult(routing);
         rebuild(false, true);
     } catch (...) {
         history=std::move(beforeHistory);
@@ -1171,101 +1299,133 @@ void LogicEditor::change(const std::function<void()> &action) {
         throw;
     }
 }
-// 把右侧属性表格的编辑写回模型；校验失败时单元格回退并给出提示。
+// 把左侧属性表格的编辑写回模型；校验失败时单元格回退并给出提示。
 void LogicEditor::apply() {
-    if(!scope.empty()) throw std::runtime_error("实例属性只读。请先切换到“编辑定义（复位）”。");
+    if (!scope.empty())
+        throw std::runtime_error("实例属性只读。请先切换到“编辑定义（复位）”。");
+    if (!properties->IsReadOnly(P_CIRCUIT, 1)) {
+        const auto name = utf8(properties->GetCellValue(P_CIRCUIT, 1));
+        if (name != current) renameCircuitTo(name);
+        return;
+    }
     if (!properties->IsReadOnly(P_STROKE, 1)) {
-        long stroke;
-        if (!properties->GetCellValue(P_STROKE, 1).ToLong(&stroke) || stroke < 1 || stroke > 20)
+        long value;
+        if (!properties->GetCellValue(P_STROKE, 1).ToLong(&value) || value < 1 || value > 20)
             throw std::runtime_error("图形线宽必须为 1–20");
-        bool filled = properties->GetCellValue(P_FILL, 1) == "1";
-        bool hasShapes = std::any_of(circuit().shapes.begin(), circuit().shapes.end(),
-                                     [&](const Shape &s) { return canvas->selected.count(s.id) != 0; });
+        const bool filled = properties->GetCellValue(P_FILL, 1) == "1";
+        const bool hasShapes = std::any_of(circuit().shapes.begin(), circuit().shapes.end(),
+            [&](const Shape &shape) { return canvas->selected.count(shape.id) != 0; });
         if (hasShapes)
             change([&] {
-                for (auto &s : circuit().shapes)
-                    if (canvas->selected.count(s.id)) {
-                        s.stroke = double(stroke);
-                        s.filled = filled;
-                    }
+                for (auto &shape : circuit().shapes)
+                    if (canvas->selected.count(shape.id)) { shape.stroke = double(value); shape.filled = filled; }
             });
-        drawingStroke = int(stroke);
+        drawingStroke = int(value);
         drawingFilled = filled;
         return;
     }
-    if (canvas->selected.size() != 1)
-        return;
-    auto id = *canvas->selected.begin();
-    auto name = utf8(properties->GetCellValue(P_LABEL, 1));
-    if (auto p = circuit().part(id)) {
-        int w = p->width;
+    auto choiceValue = [&](int row, const std::vector<std::string> &choices) {
+        const auto value = utf8(properties->GetCellValue(row, 1));
+        auto found = std::find(choices.begin(), choices.end(), value);
+        if (found != choices.end()) return int64_t(found - choices.begin());
+        long long number;
+        if (properties->GetCellValue(row, 1).ToLongLong(&number) && number >= 0 &&
+            size_t(number) < choices.size()) return int64_t(number);
+        throw std::runtime_error("请从下拉列表选择有效属性值");
+    };
+    auto editedPart = [&](Part p) {
+        p.label = utf8(properties->GetCellValue(P_LABEL, 1));
         if (!properties->IsReadOnly(P_WIDTH, 1)) {
-            long n;
-            if (!properties->GetCellValue(P_WIDTH, 1).ToLong(&n) || n < 1 || n > 32)
+            long width;
+            if (!properties->GetCellValue(P_WIDTH, 1).ToLong(&width) || width < 1 || width > 32)
                 throw std::runtime_error("位宽必须为 1–32");
-            w = int(n);
+            p.width = int(width);
         }
-        uint32_t v = !properties->IsReadOnly(P_VALUE, 1) ? unsignedValue(properties->GetCellValue(P_VALUE, 1))
-                                                         : p->value;
-        std::vector<uint32_t> data = p->data;
-        int rotation=p->rotation;
-        if(!properties->IsReadOnly(P_ROTATION,1)) {
-            long value;
-            if(!properties->GetCellValue(P_ROTATION,1).ToLong(&value)||value<0||value>3)
-                throw std::runtime_error("朝向应为 0、1、2、3，分别对应东、南、西、北");
-            rotation=int(value);
+        if (!properties->IsReadOnly(P_VALUE, 1))
+            p.value = unsignedValue(properties->GetCellValue(P_VALUE, 1));
+        if (!properties->IsReadOnly(P_ROTATION, 1))
+            p.rotation = int(choiceValue(P_ROTATION, directionNames));
+        for (const auto &entry : parameterRows) {
+            const auto row = entry.first;
+            if (properties->IsReadOnly(row, 1)) continue;
+            int64_t value;
+            if (row == P_MODE) value = choiceValue(row, finderNames);
+            else if (row == P_XOR) value = choiceValue(row, xorNames);
+            else if (booleanRows.count(row)) value = properties->GetCellValue(row, 1) == "1" ? 1 : 0;
+            else {
+                long long number;
+                if (!properties->GetCellValue(row, 1).ToLongLong(&number))
+                    throw std::runtime_error("参数请输入整数");
+                value = number;
+            }
+            p.params[entry.second.first] = value;
         }
-        auto params=p->params;
-        for(const auto &entry:parameterRows) if(!properties->IsReadOnly(entry.first,1)) {
-            auto text=properties->GetCellValue(entry.first,1); long long value;
-            if(!text.ToLongLong(&value)) throw std::runtime_error("参数请输入整数");
-            params[entry.second.first]=value;
+        if (!properties->IsReadOnly(P_INPUTS, 1)) {
+            uint32_t mask = 0;
+            for (int index = 0; index < 32; ++index)
+                if (!properties->IsReadOnly(P_INPUT_INVERT_FIRST + index, 1) &&
+                    properties->GetCellValue(P_INPUT_INVERT_FIRST + index, 1) == "1")
+                    mask |= uint32_t(1) << index;
+            p.params["invertMask"] = mask;
         }
-        auto groups=p->bitGroups;
-        if(!properties->IsReadOnly(P_GROUPS,1)) {
-            groups.clear(); std::istringstream input(utf8(properties->GetCellValue(P_GROUPS,1)));
+        if (!properties->IsReadOnly(P_GROUPS, 1)) {
+            p.bitGroups.clear();
+            std::istringstream input(utf8(properties->GetCellValue(P_GROUPS, 1)));
             std::string group;
-            while(std::getline(input,group,';')) {
-                std::vector<int> bits; std::istringstream stream(group); std::string bit;
-                while(std::getline(stream,bit,',')) { size_t used=0; int n=std::stoi(bit,&used);
-                    if(used!=bit.size()||n<0||n>=w) throw std::runtime_error("分组格式为 0,1,2,3;4,5,6,7，位编号不能超出位宽");
-                    bits.push_back(n);
+            while (std::getline(input, group, ';')) {
+                std::vector<int> bits;
+                std::istringstream stream(group);
+                std::string bit;
+                while (std::getline(stream, bit, ',')) {
+                    size_t used = 0;
+                    int number = std::stoi(bit, &used);
+                    if (used != bit.size() || number < 0 || number >= p.width)
+                        throw std::runtime_error("分组格式为 0,1,2,3;4,5,6,7，位编号不能超出位宽");
+                    bits.push_back(number);
                 }
-                if(!bits.empty()) groups.push_back(bits);
+                if (!bits.empty()) p.bitGroups.push_back(std::move(bits));
             }
         }
         if (!properties->IsReadOnly(P_MEMORY, 1)) {
-            data.clear();
-            std::istringstream in(utf8(properties->GetCellValue(P_MEMORY, 1)));
+            p.data.clear();
+            std::istringstream input(utf8(properties->GetCellValue(P_MEMORY, 1)));
             std::string word;
-            while (in >> word)
-                data.push_back(unsignedValue(U(word)));
+            while (input >> word) p.data.push_back(unsignedValue(U(word)));
         }
-        // 修改输入源不会复位运行中的仿真寄存器。
-        if ((p->kind == "Input" || p->kind == "Button") && w == p->width && name == p->label &&
-            rotation==p->rotation && params==p->params && groups==p->bitGroups) {
-            auto before = history.project;
-            p->value = v;
+        return p;
+    };
+    if (canvas->tool == "Place") {
+        auto part = editedPart(placementPart());
+        auto candidate = history.project;
+        part.id = candidate.id("p");
+        candidate.circuit(current).parts.push_back(part);
+        candidate.validate();
+        part.id.clear();
+        toolDefaults[canvas->placing + ":" + canvas->subcircuit] = std::move(part);
+        rebuild(false);
+        return;
+    }
+    if (canvas->selected.size() != 1) return;
+    const auto id = *canvas->selected.begin();
+    if (auto original = circuit().part(id)) {
+        auto changed = editedPart(*original);
+        if ((original->kind == "Input" || original->kind == "Button") &&
+            changed.width == original->width && changed.label == original->label &&
+            changed.rotation == original->rotation && changed.params == original->params &&
+            changed.bitGroups == original->bitGroups) {
+            const auto before = history.project;
+            original->value = changed.value;
             history.commit(before);
-            simulator->setInput(id, v);
+            simulator->setInput(id, changed.value);
             simulator->settle();
             rebuild(false);
             return;
         }
-        change([&] {
-            auto q = circuit().part(id);
-            q->label = name;
-            q->width = w;
-            q->value = v;
-            q->data = data;
-            q->rotation=rotation; q->params=params; q->bitGroups=groups;
-        });
-    } else
-        change([&] {
-            for (auto &n : circuit().nodes)
-                if (n.id == id)
-                    n.label = name;
-        });
+        change([&] { *circuit().part(id) = changed; });
+    } else {
+        const auto name = utf8(properties->GetCellValue(P_LABEL, 1));
+        change([&] { for (auto &node : circuit().nodes) if (node.id == id) node.label = name; });
+    }
 }
 bool LogicEditor::discard() {
     properties->SaveEditControlValue();
@@ -1518,7 +1678,8 @@ void LogicEditor::exportNetlist() {
 
 void LogicEditor::newCircuit() {
     wxTextEntryDialog d(this, U("子电路名称（在其中放置输入/输出引脚定义接口）"), U("新建子电路"),
-                        "circuit1");
+                        U("circuit" + std::to_string(history.project.circuits.size())));
+    d.SetName("new-circuit-dialog");
     if (d.ShowModal() != wxID_OK)
         return;
     auto name = utf8(d.GetValue());
@@ -1531,6 +1692,26 @@ void LogicEditor::newCircuit() {
         canvas->selected.clear();
     });
     canvas->fit();
+}
+bool LogicEditor::canDeleteCircuit() const {
+    if (!scope.empty() || current == history.project.main) return false;
+    for (const auto &c : history.project.circuits)
+        for (const auto &part : c.parts)
+            if (part.kind == "Subcircuit" && part.circuit == current) return false;
+    return true;
+}
+void LogicEditor::deleteCircuit() {
+    if (!canDeleteCircuit())
+        throw std::runtime_error("主电路、运行实例或仍被引用的子电路不能删除");
+    change([&] {
+        const auto name = current;
+        auto &definitions = history.project.circuits;
+        definitions.erase(std::remove_if(definitions.begin(), definitions.end(),
+            [&](const Circuit &c) { return c.name == name; }), definitions.end());
+        current = history.project.main;
+        canvas->selected.clear();
+        canvas->tool = "Select";
+    });
 }
 void LogicEditor::encapsulate() {
     wxTextEntryDialog d(this, U("将当前电路完整复制为可调用的子电路；接口来自输入/输出引脚"), U("封装子电路"),
@@ -1572,7 +1753,11 @@ void LogicEditor::renameCircuit() {
     wxTextEntryDialog d(this, U("新电路名称"), U("重命名"), U(current));
     if (d.ShowModal() != wxID_OK)
         return;
-    auto name = utf8(d.GetValue());
+    renameCircuitTo(utf8(d.GetValue()));
+}
+void LogicEditor::renameCircuitTo(const std::string &name) {
+    if (name.empty() || name.find_first_not_of(" \t\r\n") == std::string::npos)
+        throw std::runtime_error("电路名称不能为空");
     change([&] {
         auto old = current;
         circuit().name = name;
@@ -1741,6 +1926,8 @@ LogicCanvas::LogicCanvas(LogicEditor *editor, wxWindow *parent)
     Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent &e) {
         mouseInside = false;
         clearPinHover();
+        diagnosticTooltip.clear();
+        SetToolTip(wxEmptyString);
         e.Skip();
     });
     Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent &e) {
@@ -1788,7 +1975,8 @@ LogicCanvas::LogicCanvas(LogicEditor *editor, wxWindow *parent)
         }
         if(!owner->scope.empty()) { add(L_UP,"返回上级实例"); add(L_EDIT_DEFINITION,"编辑定义（暂停并复位）"); }
         else { add(wxID_COPY,"复制"); add(wxID_CUT,"剪切"); add(wxID_PASTE,"粘贴");
-               add(wxID_DELETE,"删除"); if(part) add(L_ROTATE,"顺时针旋转"); }
+               add(wxID_DELETE,"删除"); if(part) add(L_ROTATE,"顺时针旋转");
+               add(L_REROUTE,"重排选中导线"); }
         if(part && (part->kind=="RAM"||part->kind=="ROM")) {
             add(L_MEMORY_RUNTIME,"查看运行内存"); if(owner->scope.empty()) add(L_MEMORY_INITIAL,"编辑初始内容");
         }
@@ -1802,6 +1990,10 @@ LogicCanvas::LogicCanvas(LogicEditor *editor, wxWindow *parent)
     });
 }
 void LogicCanvas::cancel() {
+    wireSegment = -1;
+    draggedWire.clear();
+    wireDragPoints.clear();
+    previewDirty = wireDisplayDirty = true;
     if(!pressedButton.empty()) {
         auto path=pressedButton; pressedButton.clear();auto split=path.find_last_of('/');
         auto id=split==std::string::npos?path:path.substr(split+1);auto part=owner->circuit().part(id);
@@ -1813,6 +2005,8 @@ void LogicCanvas::cancel() {
     shapeHandle = -1;
     mouseInside = false;
     clearPinHover();
+    diagnosticTooltip.clear();
+    SetToolTip(wxEmptyString);
     if (before) {
         owner->history.project = *before;
         before.reset();
@@ -1915,9 +2109,7 @@ std::string LogicCanvas::hit(Point at) const {
         auto local = at - i->at;
         for(int rotation=0;rotation<i->rotation;++rotation) local={local.y,-local.x};
         if (i->kind == "Input" || i->kind == "Output") {
-            double side = i->kind == "Input" ? 1 : -1;
-            if ((std::abs(local.x) <= 18 && std::abs(local.y) <= 18) ||
-                segmentDistance(local, {side * 14, 0}, {side * 70, 0}) <= 5 / view.zoom)
+            if (std::abs(local.x) <= 18 && std::abs(local.y) <= 18)
                 return i->id;
             continue;
         }
@@ -1925,18 +2117,15 @@ std::string LogicCanvas::hit(Point at) const {
             for (const auto &s : p.circuit(i->circuit).shapes)
                 if (s.appearance && shapeHit(s, local, 6 / view.zoom))
                     return i->id;
-        if (std::abs(local.x) < 62 && std::abs(local.y) < partHeight(p, *i) / 2)
+        auto size = partSize(p, *i);
+        if (std::abs(local.x) <= size.x / 2 + 4 && std::abs(local.y) <= size.y / 2 + 4)
             return i->id;
     }
     for (auto &n : c.nodes)
         if (distance(at, n.at) < 9 / view.zoom)
             return n.id;
-    for (auto &w : c.wires) {
-        auto ps = wirePoints(p, c, w);
-        for (size_t i = 1; i < ps.size(); ++i)
-            if (segmentDistance(at, ps[i - 1], ps[i]) < 7 / view.zoom)
-                return w.id;
-    }
+    const auto candidates=wireCandidates(at);
+    if(!candidates.empty())return candidates.front();
     for (auto i = c.shapes.rbegin(); i != c.shapes.rend(); ++i)
         if (!i->appearance && shapeHit(*i, at, 6 / view.zoom))
             return i->id;
@@ -1947,11 +2136,14 @@ Endpoint LogicCanvas::endpointAt(Point at) {
         return *e;
     auto &p = owner->history.project;
     auto &c = owner->circuit();
-    for (size_t wi = 0; wi < c.wires.size(); ++wi) {
+    auto candidates=wireCandidates(at);
+    std::stable_sort(candidates.begin(),candidates.end(),[&](const std::string &a,const std::string &b){return selected.count(a)>selected.count(b);});
+    for (const auto &candidate : candidates) {
+        const size_t wi=size_t(std::find_if(c.wires.begin(),c.wires.end(),[&](const Wire &w){return w.id==candidate;})-c.wires.begin());
         auto w = c.wires[wi];
         auto ps = wirePoints(p, c, w);
         for (size_t i = 1; i < ps.size(); ++i)
-            if (segmentDistance(at, ps[i - 1], ps[i]) < 7 / view.zoom) {
+            if (segmentDistance(at, ps[i - 1], ps[i]) < FromDIP(7) / view.zoom) {
                 auto delta = ps[i] - ps[i - 1];
                 double length = delta.x * delta.x + delta.y * delta.y;
                 double t =
@@ -1966,6 +2158,7 @@ Endpoint LogicCanvas::endpointAt(Point at) {
                 std::vector<Point> second(ps.begin() + ptrdiff_t(i), ps.end() - 1);
                 c.wires[wi] = {w.id, w.a, {id, ""}, first};
                 c.wires.push_back({p.id("w"), {id, ""}, w.b, second});
+                wireDisplayDirty = previewDirty = true;
                 return {id, ""};
             }
     }
@@ -1980,6 +2173,7 @@ void LogicCanvas::route(Point at, bool freeEnd) {
         before = p;
         start = endpointAt(at);
         bends.clear();
+        previewDirty = true;
         Refresh();
         return;
     }
@@ -1994,7 +2188,11 @@ void LogicCanvas::route(Point at, bool freeEnd) {
             cancel();
             return;
         }
-        owner->circuit().wires.push_back({p.id("w"), *start, finish, bends});
+        Wire wire{p.id("w"), *start, finish, {}};
+        const auto routed=routeWire(p,owner->circuit(),wire,bends);
+        if(!routed.ok())throw std::runtime_error(routed.failure);
+        wire.bends.assign(routed.points.begin()+1,routed.points.end()-1);
+        owner->circuit().wires.push_back(wire);
         p.validate();
         auto original = *before;
         before.reset();
@@ -2006,27 +2204,27 @@ void LogicCanvas::route(Point at, bool freeEnd) {
         auto snapped = snap(at, 10);
         if (bends.empty() || distance(bends.back(), snapped) > 0.1)
             bends.push_back(snapped);
+        previewDirty = true;
         Refresh();
     }
 }
 void LogicCanvas::place(Point at) {
-    auto kind = placing, sub = subcircuit;
+    auto preset = owner->placementPart();
     owner->change([&] {
-        Part p;
+        Part p = preset;
         p.id = owner->history.project.id("p");
-        p.kind = kind;
         p.at = snap(at, 10);
-        p.circuit = sub;
-        if (kind == "Input" || kind == "Output")
+        if ((p.kind == "Input" || p.kind == "Output") && p.label.empty())
             p.label = p.id;
-        if (kind == "Text")
+        if (p.kind == "Text" && p.label.empty())
             p.label = "文字标签";
-        if (kind == "Splitter" || kind == "Joiner" || kind == "Extender" || kind == "Hex" || kind == "RAM" ||
-            kind == "ROM")
-            p.width = 8;
         owner->circuit().parts.push_back(p);
         selected = {p.id};
     });
+    // 放置是单次操作；仅在提交成功后退出预览，保留新元件供直接选择/拖动。
+    tool = "Select";
+    subcircuit.clear();
+    owner->rebuild(false);
     SetFocus();
 }
 void LogicCanvas::updateDraft(Point at, bool constrain) {
@@ -2072,10 +2270,16 @@ void LogicCanvas::finishShape() {
 void LogicCanvas::leftDown(wxMouseEvent &e) {
     clearPinHover();
     SetFocus();
+    if (handleDiagnosticClick(e.GetPosition())) return;
     Point at = view.world({double(e.GetX()), double(e.GetY())});
     mouse = at;
+    if(tool=="Select"&&!start&&e.AltDown()&&cycleWire(at,e.ShiftDown()?-1:1))return;
     auto pressed=owner->circuit().part(hit(at));
-    if(tool=="Select" && pressed && pressed->kind=="Button" && parameter(*pressed,"momentary",0)) {
+    const auto nearbyPin = pinAt(at);
+    // 缩小时端子命中范围可能覆盖整个小元件，中心应仍能选择，边缘端子优先连线。
+    const bool onPin = nearbyPin && (!pressed ||
+        distance(at, endpoint(owner->history.project, owner->circuit(), *nearbyPin)) <= distance(at, pressed->at));
+    if(tool=="Select" && !start && !onPin && pressed && pressed->kind=="Button" && parameter(*pressed,"momentary",0)) {
         pressedButton=owner->scoped(pressed->id);
         owner->simulator->setInput(pressedButton,parameter(*pressed,"activeLow",0)?0:1);
         owner->simulator->settle(); owner->rebuild(false);
@@ -2111,7 +2315,7 @@ void LogicCanvas::leftDown(wxMouseEvent &e) {
         Refresh();
         return;
     }
-    if (tool == "Select" && selected.size() == 1) {
+    if (tool == "Select" && !start && selected.size() == 1) {
         for (const auto &s : owner->circuit().shapes) {
             if (!selected.count(s.id) || s.appearance != appearance)
                 continue;
@@ -2133,7 +2337,8 @@ void LogicCanvas::leftDown(wxMouseEvent &e) {
         place(at);
         return;
     }
-    if (tool == "Wire") {
+    if(tool=="Select"&&!e.ShiftDown()&&!onPin&&owner->scope.empty()&&beginWireDrag(at))return;
+    if (tool == "Wire" || (tool == "Select" && !appearance && (start || (onPin && !e.ShiftDown())))) {
         route(at);
         return;
     }
@@ -2145,6 +2350,10 @@ void LogicCanvas::leftDown(wxMouseEvent &e) {
         return;
     }
     auto id = hit(at);
+    if(tool=="Select"&&!e.ShiftDown()&&std::any_of(owner->circuit().wires.begin(),owner->circuit().wires.end(),
+        [&](const Wire &w){return w.id==id;})) {
+        selected={id};owner->inspect();Refresh();return;
+    }
     down = snap(at, 10);
     if (id.empty()) {
         if (!e.ShiftDown())
@@ -2170,6 +2379,7 @@ void LogicCanvas::leftDown(wxMouseEvent &e) {
     Refresh();
 }
 void LogicCanvas::move(Point delta) {
+    wireDisplayDirty = previewDirty = true;
     auto &c = owner->circuit();
     for (auto &s : c.shapes)
         if (selected.count(s.id)) {
@@ -2193,12 +2403,14 @@ void LogicCanvas::motion(wxMouseEvent &e) {
     hoverScreen = screen;
     mouseInside = GetClientRect().Contains(e.GetPosition());
     mouse = view.world(screen);
+    updateDiagnosticTooltip(screen);
     if (panning) {
         view.offset = view.offset + (screen - lastScreen);
         lastScreen = screen;
         Refresh();
         return;
     }
+    if(dragging&&wireSegment>=0&&e.LeftIsDown()){updateWireDrag(mouse);return;}
     if (draft) {
         updateDraft(mouse, e.ShiftDown());
         Refresh();
@@ -2255,6 +2467,8 @@ void LogicCanvas::leftUp(wxMouseEvent &event) {
     }
     if (dragging) {
         auto saved = *before;
+        const bool segmentEdit = wireSegment >= 0;
+        if(!segmentEdit)owner->routingResult(rerouteChangedGeometry(owner->history.project,saved));
         bool modified = serialize(saved) != serialize(owner->history.project);
         try {
             owner->history.project.validate();
@@ -2265,12 +2479,15 @@ void LogicCanvas::leftUp(wxMouseEvent &event) {
         }
         owner->history.commit(saved);
         shapeHandle = -1;
+        wireSegment = -1;
+        draggedWire.clear();
+        wireDragPoints.clear();
         draggedInterface.clear();
         before.reset();
         dragging = false;
         if (HasCapture())
             ReleaseMouse();
-        owner->rebuild(modified, modified);
+        owner->rebuild(modified&&!segmentEdit, modified);
     }
     if (box) {
         auto lo = Point{std::min(mouse.x, boxStart.x), std::min(mouse.y, boxStart.y)},
@@ -2301,7 +2518,7 @@ void LogicCanvas::doubleClick(wxMouseEvent &e) {
     if (appearance)
         return;
     Point at = view.world({double(e.GetX()), double(e.GetY())});
-    if (tool == "Wire") {
+    if (tool == "Wire" || (tool == "Select" && start)) {
         route(at, true);
         return;
     }
@@ -2345,6 +2562,7 @@ void LogicCanvas::doubleClick(wxMouseEvent &e) {
 void LogicCanvas::key(wxKeyEvent &e) {
     try {
         int code = e.GetKeyCode();
+        if(code==WXK_TAB&&!e.ControlDown()&&!e.AltDown()&&tool=="Select"&&cycleWire(mouse,e.ShiftDown()?-1:1))return;
         if(e.AltDown() && code==WXK_UP) {
             if(!owner->navigation.empty()) owner->navigateTo(owner->navigation.size()-1);
             return;
@@ -2392,6 +2610,7 @@ void LogicCanvas::key(wxKeyEvent &e) {
 }
 void LogicCanvas::paint(wxPaintEvent &) {
     updatePinHover();
+    if (mouseInside) updateDiagnosticTooltip(hoverScreen);
     wxAutoBufferedPaintDC dc(this);
     dc.SetBackground(wxBrush(wxColour("#f9fbfd")));
     dc.Clear();
@@ -2433,14 +2652,14 @@ void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
         if (!clean && c.shapes.empty()) {
             g.SetPen(wxPen(wxColour("#b5c0cc"), 1, wxPENSTYLE_SHORT_DASH));
             g.SetBrush(*wxTRANSPARENT_BRUSH);
-            double h = partHeight(project, instance);
-            g.DrawRectangle(-55, -h / 2, 110, h);
+            auto body = partSize(project, instance);
+            g.DrawRectangle(-body.x / 2, -body.y / 2, body.x, body.y);
         }
     }
     if (!appearance) {
-        std::set<std::string> bad;
+        std::set<std::string> bad, warned;
         for (auto &i : owner->issues)
-            if (i.severity == "error")
+            if (i.severity == "error" || i.severity == "warning")
                 {
                     auto object=i.object;
                     if(!owner->scope.empty()) {
@@ -2448,18 +2667,24 @@ void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
                         if(object.rfind(prefix,0)!=0) continue;
                         object=object.substr(prefix.size());
                     }
-                    bad.insert(object.substr(0,object.find('/')));
+                    (i.severity == "error" ? bad : warned).insert(object.substr(0,object.find('/')));
                 }
         for (auto &w : c.wires) {
             auto signal = owner->read({w.id, ""});
-            g.SetPen(wxPen(!clean && selected.count(w.id) ? wxColour("#6366f1") : signalColour(signal),
+            auto colour = !clean && bad.count(w.id) ? wxColour("#dc2626") :
+                          !clean && warned.count(w.id) ? wxColour("#bd790c") :
+                          !clean && selected.count(w.id) ? wxColour("#6366f1") : signalColour(signal);
+            g.SetPen(wxPen(colour,
                            signal.width > 1 ? 4 : 2));
-            line(g, wirePoints(project, c, w));
+            drawWire(g, w, clean);
         }
         for (auto &n : c.nodes) {
             auto s = owner->read({n.id, ""});
-            g.SetPen(wxPen(signalColour(s)));
-            g.SetBrush(wxBrush(!clean && selected.count(n.id) ? wxColour("#6366f1") : signalColour(s)));
+            auto colour = !clean && bad.count(n.id) ? wxColour("#dc2626") :
+                          !clean && warned.count(n.id) ? wxColour("#bd790c") :
+                          !clean && selected.count(n.id) ? wxColour("#6366f1") : signalColour(s);
+            g.SetPen(wxPen(colour));
+            g.SetBrush(wxBrush(colour));
             g.DrawEllipse(n.at.x - 4, n.at.y - 4, 8, 8);
             if (!n.label.empty())
                 text(g, n.label, {n.at.x + 6, n.at.y - 23});
@@ -2467,13 +2692,16 @@ void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
         for (auto &p : c.parts)
             drawSymbol(
                 g, project, p, [&](const Port &pin) { return owner->read({p.id, pin.id}); },
-                !clean && selected.count(p.id), bad.count(p.id) != 0);
+                !clean && selected.count(p.id), bad.count(p.id) != 0, false, true,
+                !clean && warned.count(p.id) != 0);
+        if(!clean)drawWireHandles(g);
         if (!clean && start) {
-            g.SetPen(wxPen(wxColour("#6366f1"), 2, wxPENSTYLE_SHORT_DASH));
+            const auto &preview=wirePreview();
+            g.SetPen(wxPen(wxColour(preview.ok()?"#6366f1":"#dc2626"), 2, wxPENSTYLE_SHORT_DASH));
             std::vector<Point> ps{endpoint(project, c, *start)};
             ps.insert(ps.end(), bends.begin(), bends.end());
             ps.push_back(snap(mouse, 10));
-            line(g, orthogonal(ps));
+            line(g, preview.ok()?preview.points:orthogonal(ps));
         }
     } // 原理图层
     if (!clean && draft)
@@ -2485,19 +2713,16 @@ void LogicCanvas::render(wxGraphicsContext &g, wxSize size, bool clean) {
                         std::abs(mouse.x - boxStart.x), std::abs(mouse.y - boxStart.y));
     }
     if (!appearance && !clean && tool == "Place" && !start) {
-        Part p;
-        p.kind = placing;
-        p.circuit = subcircuit;
+        Part p = owner->placementPart();
         p.at = snap(mouse, 10);
-        if (placing == "Splitter" || placing == "Joiner" || placing == "Extender" || placing == "Hex" ||
-            placing == "RAM" || placing == "ROM")
-            p.width = 8;
         drawSymbol(
             g, project, p, [](const Port &pin) { return Signal::unknown(pin.width); }, false, false, true);
     }
     g.PopState();
     if (!clean)
         drawPinHover(g);
+    if (!clean)
+        drawDiagnostics(g);
     if (!appearance && !clean && c.parts.empty() && c.nodes.empty() && c.shapes.empty())
         text(g, "从左侧元件库开始，或 文件 → 打开半加器示例", {35, 45}, 13, wxColour("#8493a3"));
 }
@@ -2624,17 +2849,29 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     if (componentCount != library().size() + 3)
         throw std::runtime_error("initial component tree is incomplete");
     auto shortcuts = dynamic_cast<wxToolBar *>(wxWindow::FindWindowByName("logic-components", this));
-    if (!shortcuts || shortcuts->GetToolsCount() != 13)
+    const std::vector<std::string> toolbarKinds = {
+        "Select", "Wire", "Input", "Output", "Not", "Buffer", "And", "Or", "Xor", "Nand", "Nor", "Xnor"};
+    if (!shortcuts || shortcuts->GetToolsCount() != toolbarKinds.size() + 2 ||
+        wxWindow::FindWindowByName("logic-actions", this))
         throw std::runtime_error("digital component toolbar missing");
+    size_t shortcutIndex = 0;
     for (size_t i = 0; i < shortcuts->GetToolsCount(); ++i) {
         auto tool = shortcuts->GetToolByPos(int(i));
+        if (tool->IsSeparator())
+            continue;
+        if (shortcutIndex >= toolbarKinds.size() || U(toolbarKinds[shortcutIndex++]) != tool->GetLongHelp())
+            throw std::runtime_error("compact toolbar contains unexpected tools");
         if (!tool->GetNormalBitmapBundle().IsOk())
             throw std::runtime_error("component toolbar bitmap missing");
         wxCommandEvent event(wxEVT_TOOL, tool->GetId());
         shortcuts->GetEventHandler()->ProcessEvent(event);
-        if (canvas->tool != "Place" || U(canvas->placing) != tool->GetLongHelp())
+        const bool action = tool->GetId() == L_SELECT || tool->GetId() == L_WIRE;
+        if (action ? U(canvas->tool) != tool->GetLongHelp()
+                   : canvas->tool != "Place" || U(canvas->placing) != tool->GetLongHelp())
             throw std::runtime_error("component shortcut chose wrong kind");
     }
+    if (shortcutIndex != toolbarKinds.size())
+        throw std::runtime_error("compact toolbar is incomplete");
     std::vector<std::string> iconKinds;
     for (auto &part : library())
         iconKinds.push_back(part.kind);
@@ -2719,8 +2956,39 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     }
     if (serialize(symbols) != beforeSymbols)
         throw std::runtime_error("rendering changed the circuit model");
+    // 无说明文字时，主体包围盒之外只允许边框连接圆点，不能残留外伸引线。
+    for (auto p : specimens) {
+        if (p.kind == "Text")
+            continue;
+        const auto body = partSize(symbols, p);
+        for (int rotation = 0; rotation < 4; ++rotation) {
+            p.rotation = rotation;
+            const double halfWidth = (rotation % 2 ? body.y : body.x) / 2;
+            const double halfHeight = (rotation % 2 ? body.x : body.y) / 2;
+            const int w = int(std::ceil(2 * halfWidth)) + 60;
+            const int h = int(std::ceil(2 * halfHeight)) + 60;
+            p.at = {w / 2.0, h / 2.0};
+            wxBitmap bitmap(w, h, 32);
+            {
+                wxMemoryDC dc(bitmap);
+                dc.SetBackground(*wxWHITE_BRUSH);
+                dc.Clear();
+                std::unique_ptr<wxGraphicsContext> g(wxGraphicsContext::Create(dc));
+                if (!g)
+                    throw std::runtime_error("compact symbol graphics context failed");
+                drawSymbol(*g, symbols, p, [](const Port &pin) { return Signal::number(0, pin.width); },
+                           false, false, false, false);
+            }
+            auto image = bitmap.ConvertToImage();
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; ++x)
+                    if ((std::abs(x - p.at.x) > halfWidth + 5 || std::abs(y - p.at.y) > halfHeight + 5) &&
+                        (image.GetRed(x, y) != 255 || image.GetGreen(x, y) != 255 || image.GetBlue(x, y) != 255))
+                        throw std::runtime_error("symbol draws outside border terminal envelope: " + p.kind);
+        }
+    }
     // 输出五种信号状态在紧凑 I/O 主体上的栅格证据。
-    wxBitmap ioSheet(760, 540, 32);
+    wxBitmap ioSheet(760, 640, 32);
     std::vector<Signal> ioStates{Signal::number(0, 1), Signal::number(1, 1), Signal::unknown(1),
                                  Signal::floating(1), Signal::failure(1)};
     {
@@ -2730,11 +2998,11 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
         std::unique_ptr<wxGraphicsContext> g(wxGraphicsContext::Create(dc));
         for (size_t row = 0; row < ioStates.size(); ++row) {
             const auto state = ioStates[row];
-            text(*g, state.text(), {30, 45.0 + row * 100}, 14, signalColour(state));
+            text(*g, state.text(), {30, 45.0 + row * 120}, 14, signalColour(state));
             for (int col = 0; col < 3; ++col) {
                 Part p;
                 p.kind = col == 0 ? "Input" : col == 1 ? "Output" : "And";
-                p.at = {180.0 + col * 220, 60.0 + row * 100};
+                p.at = {180.0 + col * 220, 60.0 + row * 120};
                 drawSymbol(*g, symbols, p, [&](const Port &) { return state; }, row == 1);
             }
         }
@@ -2742,7 +3010,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     auto ioImage = ioSheet.ConvertToImage();
     std::set<unsigned> bodyColours;
     for (int row = 0; row < 5; ++row) {
-        int x = 172, y = 68 + row * 100;
+        int x = 172, y = 68 + row * 120;
         unsigned rgb = (unsigned(ioImage.GetRed(x, y)) << 16) | (unsigned(ioImage.GetGreen(x, y)) << 8) |
                        ioImage.GetBlue(x, y);
         bodyColours.insert(rgb);
@@ -2750,13 +3018,45 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
             ioImage.GetGreen(172, y) != ioImage.GetGreen(392, y) ||
             ioImage.GetBlue(172, y) != ioImage.GetBlue(392, y))
             throw std::runtime_error("I/O state fills disagree");
-        if (ioImage.GetRed(180, 80 + row * 100) != 255 || ioImage.GetBlue(180, 80 + row * 100) != 255)
+        if (ioImage.GetRed(180, 80 + row * 120) != 255 || ioImage.GetBlue(180, 80 + row * 120) != 255)
             throw std::runtime_error("I/O body did not shrink");
     }
     if (bodyColours.size() != 5)
         throw std::runtime_error("I/O states need distinct body colours");
     ioImage.SaveFile(wxString((folder / "io-signal-states.png").wstring()), wxBITMAP_TYPE_PNG);
-    // 复现用户“输入 → 非门 → 输出”电路，锚点保持不变。
+    // 所有元件、四种方向均从可见边框圆点开始连线，不保留旧的长引线命中区域。
+    current = "main";
+    canvas->cancel();
+    canvas->appearance = false;
+    canvas->view.zoom = 1;
+    for (auto p : specimens) {
+        Project single = symbols;
+        p.at = {200, 200};
+        single.circuits.push_back(Circuit{});
+        single.circuits.back().name = "symbol-hit-check";
+        for (int rotation = 0; rotation < 4; ++rotation) {
+            p.rotation = rotation;
+            single.circuits.back().parts = {p};
+            history.reset(single);
+            current = "symbol-hit-check";
+            for (const auto &pin : ports(history.project, p)) {
+                const auto target = canvas->pinAt(p.at + pin.at);
+                if (!target || !(*target == Endpoint{p.id, pin.id}))
+                    throw std::runtime_error("border terminal hit failed: " + p.kind);
+            }
+            if (p.kind == "Input" || p.kind == "Output") {
+                Point tail{p.kind == "Input" ? 45.0 : -45.0, 0};
+                for (int turn = 0; turn < rotation; ++turn)
+                    tail = {-tail.y, tail.x};
+                if (!canvas->hit(p.at + tail).empty() || canvas->pinAt(p.at + tail))
+                    throw std::runtime_error("I/O retains an invisible lead hit target");
+            }
+        }
+    }
+    writeAtomic(folder / "SYMBOLS-PASS.txt",
+                "All library bodies and border terminals: no external leads in 4 rotated raster renders; "
+                "all border pin hit targets passed; no invisible I/O tail hit regions.\n");
+    // 复现用户“输入 → 非门 →输出”电路，保持端口 ID 与电气连接。
     Project inverter;
     inverter.nextId = 3;
     Part input, gate, output;
@@ -2813,7 +3113,8 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
                                      std::to_string(canvas->GetClientSize().y) +
                                      " inside=" + std::to_string(canvas->mouseInside) +
                                      " target=" + (canvas->hoveredPin ? canvas->hoveredPin->key() : "none"));
-        mouseMove({300.0 + canvas->FromDIP(12), 160});
+        // 向空白的竖直方向移出；缩小时水平移动可能靠近另一侧端子。
+        mouseMove({300, 160.0 + canvas->FromDIP(12)});
         if (canvas->hoveredPin || canvas->rippleTimer.IsRunning())
             throw std::runtime_error("pin hover remained outside connection radius");
     }
@@ -2826,7 +3127,8 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     circuit().nodes.pop_back();
     canvas->view.zoom = 1;
     canvas->view.offset = {40, 20};
-    mouseMove({305, 160});
+    const auto hoverScreen = canvas->view.screen(hoverAnchor) + Point{5, 0};
+    mouseMove(hoverScreen);
     auto hoverImage = [&](bool clean) {
         wxBitmap bmp(760, 330, 32);
         {
@@ -2862,11 +3164,11 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     if (!samePixels(cleanWithHover, hoverImage(true)))
         throw std::runtime_error("hover leaked into exported circuit image");
     canvas->tool = "Place";
-    mouseMove({305, 160});
+    mouseMove(hoverScreen);
     if (canvas->hoveredPin || canvas->rippleTimer.IsRunning())
         throw std::runtime_error("hover remained active during component placement");
     canvas->tool = "Wire";
-    mouseMove({305, 160});
+    mouseMove(hoverScreen);
     if (!canvas->hoveredPin)
         throw std::runtime_error("hover missing in wire tool");
     canvas->panning = true;
@@ -2879,6 +3181,84 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     if (serialize(history.project) != hoverProject || simulator->time() != hoverTime ||
         simulator->pending() != hoverPending || simulator->read({"output", "A"}) != Signal::number(0, 1))
         throw std::runtime_error("hover changed project or simulation state");
+    // 用实际鼠标事件验证“单次放置 → 选择/拖动 → 引脚连线”的完整工作流。
+    history.reset(Project{});
+    current = "main";
+    canvas->selected.clear();
+    canvas->view.zoom = 1;
+    canvas->view.offset = {20, 20};
+    rebuild(true, true);
+    auto clickCanvas = [&](Point at) {
+        const auto screen = canvas->view.screen(at);
+        wxMouseEvent motion(wxEVT_MOTION);
+        motion.SetPosition({int(std::lround(screen.x)), int(std::lround(screen.y))});
+        canvas->motion(motion);
+        wxMouseEvent down(wxEVT_LEFT_DOWN);
+        down.SetPosition(motion.GetPosition());
+        canvas->leftDown(down);
+        wxMouseEvent up(wxEVT_LEFT_UP);
+        up.SetPosition(motion.GetPosition());
+        canvas->leftUp(up);
+    };
+    auto chooseComponent = [&](const std::string &kind) {
+        for (size_t i = 0; i < shortcuts->GetToolsCount(); ++i) {
+            auto tool = shortcuts->GetToolByPos(int(i));
+            if (tool->IsSeparator() || tool->GetLongHelp() != U(kind))
+                continue;
+            wxCommandEvent event(wxEVT_TOOL, tool->GetId());
+            shortcuts->GetEventHandler()->ProcessEvent(event);
+            return;
+        }
+        throw std::runtime_error("placement shortcut missing: " + kind);
+    };
+    chooseComponent("Input");
+    clickCanvas({120, 120});
+    const auto placedInput = circuit().parts.back().id;
+    if (circuit().parts.size() != 1 || canvas->tool != "Select" || !canvas->selected.count(placedInput) ||
+        !status->GetLabel().Contains(U("工具：Select")))
+        throw std::runtime_error("single placement did not return to selection");
+    clickCanvas({280, 280});
+    if (circuit().parts.size() != 1 || !canvas->selected.empty())
+        throw std::runtime_error("blank click repeated the placed component");
+    chooseComponent("Output");
+    clickCanvas({420, 120});
+    const auto placedOutput = circuit().parts.back().id;
+    if (circuit().parts.size() != 2 || canvas->tool != "Select")
+        throw std::runtime_error("second placement did not return to selection");
+    canvas->view.zoom = .25;
+    canvas->view.offset = {100, 100};
+    clickCanvas(circuit().part(placedInput)->at);
+    if (canvas->start || !canvas->selected.count(placedInput))
+        throw std::runtime_error("zoomed-out component center starts a wire instead of selecting");
+    canvas->view.zoom = 1;
+    canvas->view.offset = {20, 20};
+    const Endpoint inputPin{placedInput, "Y"}, outputPin{placedOutput, "A"};
+    const auto inputAnchor = endpoint(history.project, circuit(), inputPin);
+    clickCanvas(inputAnchor + Point{-3, 0});
+    if (!canvas->start || !(*canvas->start == inputPin) || canvas->dragging || canvas->tool != "Select")
+        throw std::runtime_error("selection-mode pin click did not start a wire");
+    clickCanvas({280, 200});
+    if (canvas->bends.size() != 1 || !circuit().wires.empty() || circuit().parts.size() != 2)
+        throw std::runtime_error("selection-mode wire bend changed placement or selection");
+    clickCanvas(endpoint(history.project, circuit(), outputPin));
+    if (circuit().wires.size() != 1 || canvas->start || canvas->tool != "Select" ||
+        !(circuit().wires.front().a == inputPin) || !(circuit().wires.front().b == outputPin) ||
+        simulator->read(outputPin) != Signal::number(0, 1))
+        throw std::runtime_error("selection-mode wire did not finish on the correct terminals");
+    const auto connectedProject = serialize(history.project);
+    clickCanvas(inputAnchor);
+    clickCanvas({280, 240});
+    wxKeyEvent escape(wxEVT_KEY_DOWN);
+    escape.m_keyCode = WXK_ESCAPE;
+    canvas->key(escape);
+    if (canvas->start || canvas->tool != "Select" || serialize(history.project) != connectedProject)
+        throw std::runtime_error("selection-mode wire cancellation changed the project");
+    undo();
+    if (!circuit().wires.empty() || circuit().parts.size() != 2)
+        throw std::runtime_error("selection-mode wire undo did not preserve placed components");
+    undo(true);
+    if (serialize(history.project) != connectedProject)
+        throw std::runtime_error("selection-mode wire redo failed");
     history.reset(halfAdder());
     current = "main";
     canvas->cancel();
@@ -2985,7 +3365,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     canvas->placing = "Clock";
     canvas->tool = "Place";
     canvas->place({200, 550});
-    if (circuit().parts.back().kind != "Clock")
+    if (circuit().parts.back().kind != "Clock" || canvas->tool != "Select")
         throw std::runtime_error("GUI library placement failed");
     undo();
     for (const std::string name : {"bus-register", "hierarchical-adder"}) {
@@ -3045,6 +3425,8 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     canvas->placing = "Subcircuit";
     canvas->subcircuit = definition;
     canvas->place({360, 180});
+    if (canvas->tool != "Select" || !canvas->subcircuit.empty())
+        throw std::runtime_error("custom component placement did not return to selection");
     const auto customInstanceId = circuit().parts.back().id;
     change([&] {
         // 复制导入的接口，组成一个完整、可测试的顶层半加器。
@@ -3370,6 +3752,187 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     canvas->exportPng(wxString((folder/"hierarchy-right-instance.png").wstring()));
     canvas->selected={"mem"};inspect();
     navigateTo(0);canvas->fit();
+    // 真实窗口布局、子电路命令以及工具属性的回归。
+    Layout();
+    if (properties->ClientToScreen({0,0}).y <= tree->ClientToScreen({0,0}).y ||
+        properties->ClientToScreen({0,0}).x >= canvas->ClientToScreen({0,0}).x ||
+        hierarchy->GetSize().y > FromDIP(96) || diagnosticsWindow->IsShown())
+        throw std::runtime_error("library/property layout or compact hierarchy failed");
+    history.reset(Project{}); current="main"; canvas->selected.clear(); canvas->tool="Select";
+    rebuild(true,true);
+    if (deleteCircuitButton->IsEnabled() || canDeleteCircuit() ||
+        !GetMenuBar()->FindItem(L_NEW_CIRCUIT)->GetItemLabel().Contains("Ctrl+Shift+N") ||
+        !GetMenuBar()->FindItem(L_DEL_CIRCUIT)->GetItemLabel().Contains("Ctrl+Shift+Delete"))
+        throw std::runtime_error("subcircuit shortcut/protection missing");
+    wxTheApp->CallAfter([] {
+        auto dialog=dynamic_cast<wxTextEntryDialog*>(wxWindow::FindWindowByName("new-circuit-dialog"));
+        if(!dialog)throw std::runtime_error("new subcircuit shortcut did not open its dialog");
+        dialog->SetValue(U("layout_child"));dialog->EndModal(wxID_OK);
+    });
+    wxCommandEvent addCircuit(wxEVT_BUTTON,L_NEW_CIRCUIT);
+    newCircuitButton->GetEventHandler()->ProcessEvent(addCircuit);
+    if(current!="layout_child" || !deleteCircuitButton->IsEnabled() || history.project.circuits.size()!=2)
+        throw std::runtime_error("new subcircuit button failed");
+    wxCommandEvent removeCircuit(wxEVT_BUTTON,L_DEL_CIRCUIT);
+    deleteCircuitButton->GetEventHandler()->ProcessEvent(removeCircuit);
+    if(current!="main" || history.project.circuits.size()!=1)
+        throw std::runtime_error("delete subcircuit button failed");
+    undo();
+    if(history.project.circuits.size()!=2)throw std::runtime_error("subcircuit deletion undo failed");
+    undo(true);
+    properties->SetCellValue(P_CIRCUIT,1,"renamed_main");apply();
+    if(current!="renamed_main" || history.project.main!=current)
+        throw std::runtime_error("circuit property rename failed");
+    undo();
+    const auto templateBefore=serialize(history.project);
+    const auto templateTime=simulator->time();
+    canvas->tool="Place";canvas->placing="And";canvas->subcircuit.clear();canvas->selected.clear();inspect();
+    if(properties->GetCellValue(P_ROTATION,1)!=U("右") || properties->GetRowSize(P_INVERT)!=0 ||
+       properties->GetRowSize(P_ID)!=0 || properties->GetRowSize(P_INPUT_INVERT_FIRST)==0)
+        throw std::runtime_error("Logisim-style property rows missing");
+    properties->SetCellValue(P_ROTATION,1,U("下"));properties->SetCellValue(P_WIDTH,1,"8");
+    properties->SetCellValue(P_INPUTS,1,"3");properties->SetCellValue(P_INPUT_INVERT_FIRST,1,"1");apply();
+    if(serialize(history.project)!=templateBefore || simulator->time()!=templateTime)
+        throw std::runtime_error("tool defaults modified the circuit or simulation");
+    canvas->place({200,200});
+    const auto &configured=circuit().parts.back();
+    if(configured.width!=8 || configured.rotation!=1 || parameter(configured,"inputs",2)!=3 ||
+       parameter(configured,"invertMask",0)!=1 || canvas->tool!="Select")
+        throw std::runtime_error("placement did not use inspected tool properties");
+    properties->SetCellValue(P_INPUT_INVERT_FIRST+2,1,"1");apply();
+    if(parameter(circuit().parts.back(),"invertMask",0)!=5)
+        throw std::runtime_error("individual input inversion edit failed");
+
+    // ERC 表现层：颜色、外围警示图标、Tooltip、列表聚焦和干净导出。
+    Project inlineProject;inlineProject.name="画布内联 ERC 验证";
+    auto inlinePart=[&](const std::string &kind,Point at,int width) {
+        Part p;p.id=inlineProject.id("p");p.kind=kind;p.at=at;p.width=width;
+        inlineProject.circuit("main").parts.push_back(p);return p.id;
+    };
+    auto driver=inlinePart("Constant",{120,160},1),mismatchLoad=inlinePart("Output",{420,160},8);
+    const auto warnedGate=inlinePart("And",{435,175},1);
+    const auto floatingOutput=inlinePart("Output",{760,420},1);
+    inlineProject.circuit("main").wires.push_back({inlineProject.id("w"),{driver,"Y"},{mismatchLoad,"A"},{}});
+    inlineProject.validate();
+    writeAtomic(folder/"inline-erc-preview.logic.json",serialize(inlineProject));
+    history.reset(inlineProject);current="main";canvas->cancel();canvas->selected.clear();canvas->tool="Select";
+    rebuild(true,true);canvas->view.zoom=.9;canvas->view.offset={80,90};Layout();
+    const auto inlineBytes=serialize(history.project);
+    const auto inlineTime=simulator->time(),inlinePending=simulator->pending();
+    const auto inlineView=canvas->view;
+    const auto warnedPin=endpoint(history.project,circuit(),{mismatchLoad,"A"});
+    const auto warnedScreen=canvas->view.screen(warnedPin);
+    if(canvas->handleDiagnosticClick({int(std::lround(warnedScreen.x)),int(std::lround(warnedScreen.y))}))
+        throw std::runtime_error("ERC badge intercepted a connection terminal");
+    clickCanvas(warnedPin);
+    if(!canvas->start)throw std::runtime_error("ERC markers prevented selection-mode pin wiring");
+    for(const auto &group:canvas->diagnosticMarkers())
+        if(canvas->handleDiagnosticClick({group.bounds.x+group.bounds.width/2,group.bounds.y+group.bounds.height/2}))
+            throw std::runtime_error("ERC icon interrupted an in-progress wire");
+    canvas->cancel();
+    const auto markers=canvas->diagnosticMarkers();
+    auto marker=std::find_if(markers.begin(),markers.end(),[&](const auto &m){return m.object==warnedGate;});
+    const auto single=std::find_if(markers.begin(),markers.end(),[&](const auto &m){return m.object==floatingOutput;});
+    const auto adjacent=std::find_if(markers.begin(),markers.end(),[&](const auto &m){return m.object==mismatchLoad;});
+    if(marker==markers.end() || marker->issues.size()<2 || single==markers.end() || single->issues.size()!=1 ||
+       single->error || adjacent==markers.end() || !adjacent->error)
+        throw std::runtime_error("ERC object icons or severity missing");
+    const wxPoint center{marker->bounds.x+marker->bounds.width/2,marker->bounds.y+marker->bounds.height/2};
+    canvas->updateDiagnosticTooltip({double(center.x),double(center.y)});
+    for(const auto *field:{"规则：","严重级别：","涉及对象：","修复建议："})
+        if(!canvas->diagnosticTooltip.Contains(U(field)))throw std::runtime_error("ERC tooltip field missing");
+    auto inlineImage=[&](bool clean) {
+        auto size=canvas->GetClientSize();wxBitmap bitmap(size.x,size.y,32);
+        { wxMemoryDC dc(bitmap);dc.SetBackground(*wxWHITE_BRUSH);dc.Clear();
+          std::unique_ptr<wxGraphicsContext> graphics(wxGraphicsContext::Create(dc));
+          if(!graphics)throw std::runtime_error("inline ERC graphics context failed");
+          canvas->render(*graphics,size,clean); }
+        return bitmap.ConvertToImage();
+    };
+    const auto cleanBefore=inlineImage(true);
+    auto overlayImage=inlineImage(false);
+    if(!overlayImage.SaveFile(wxString((folder/"inline-erc-canvas.png").wstring()),wxBITMAP_TYPE_PNG) ||
+       !samePixels(cleanBefore,inlineImage(true)))
+        throw std::runtime_error("inline ERC changed clean export");
+    if(!canvas->handleDiagnosticClick(center) || !diagnosticsWindow->IsShown() ||
+       diagnosticOrder.empty() || diagnosticOrder.front()!=marker->issues.front())
+        throw std::runtime_error("ERC icon click did not expand related problems");
+    wxCommandEvent focusProblem(wxEVT_LISTBOX,diagnostics->GetId());focusProblem.SetInt(0);
+    diagnostics->GetEventHandler()->ProcessEvent(focusProblem);
+    if(canvas->selected.empty() || std::abs(canvas->view.zoom-inlineView.zoom)<.01)
+        throw std::runtime_error("problem list did not zoom and highlight");
+    diagnosticsWindow->Hide();canvas->view=inlineView;canvas->selected.clear();
+    canvas->updateDiagnosticTooltip(canvas->view.screen(circuit().part(mismatchLoad)->at));
+    if(!canvas->diagnosticTooltip.Contains(U("规则：")))
+        throw std::runtime_error("object colour warning lost its tooltip");
+    if(serialize(history.project)!=inlineBytes || simulator->time()!=inlineTime || simulator->pending()!=inlinePending)
+        throw std::runtime_error("ERC interaction changed project or simulation state");
+
+    // 单个 NOR、单条警告以及密集摆放、缩放、旋转、视口边缘均使用不遮挡的图标。
+    Project collisionProject;collisionProject.name="ERC 图标避让验证";
+    Part nor;nor.id=collisionProject.id("p");nor.kind="Nor";nor.label="NOR 警示避让";
+    collisionProject.circuit("main").parts.push_back(nor);
+    history.reset(collisionProject);current="main";canvas->selected.clear();rebuild(true,true);
+    auto verifyMarkers=[&] {
+        const auto markers=canvas->diagnosticMarkers();
+        std::set<std::string> markedObjects;
+        for(size_t i=0;i<markers.size();++i) {
+            const auto &bounds=markers[i].bounds;
+            if(!markedObjects.insert(markers[i].object).second)
+                throw std::runtime_error("multiple ERC icons for the same object");
+            if(markers[i].issues.empty() || bounds.width!=canvas->FromDIP(18) || bounds.height!=canvas->FromDIP(18) || !canvas->GetClientRect().Contains(bounds))
+                throw std::runtime_error("ERC icon missing issues, oversized, or offscreen");
+            for(size_t j=0;j<i;++j)
+                if(bounds.Intersects(markers[j].bounds))throw std::runtime_error("ERC icons overlap");
+            for(const auto &part:circuit().parts) {
+                auto size=partSize(history.project,part);
+                if(part.rotation%2)std::swap(size.x,size.y);
+                const auto a=canvas->view.screen(part.at-size*.5),b=canvas->view.screen(part.at+size*.5);
+                wxRect body(int(a.x)-2,int(a.y)-2,int(std::ceil(b.x-a.x))+4,int(std::ceil(b.y-a.y))+4);
+                if(bounds.Intersects(body))throw std::runtime_error("ERC icon obscures a component body");
+                for(const auto &pin:ports(history.project,part)) {
+                    const auto at=canvas->view.screen(part.at+pin.at);
+                    const int radius=canvas->FromDIP(9);
+                    wxRect terminal(int(at.x)-radius,int(at.y)-radius,2*radius+1,2*radius+1);
+                    if(bounds.Intersects(terminal))throw std::runtime_error("ERC icon obscures a connection target");
+                }
+            }
+        }
+    };
+    for(int rotation=0;rotation<4;++rotation) {
+        circuit().parts.front().rotation=rotation;rebuild(true,true);
+        for(double zoom:{.15,.5,1.0,2.0,4.0}) {
+            canvas->view.zoom=zoom;
+            canvas->view.offset={canvas->GetClientSize().x*.5,canvas->GetClientSize().y*.5};
+            verifyMarkers();
+            if(canvas->diagnosticMarkers().empty())
+                throw std::runtime_error("NOR warning icon disappeared despite available space");
+        }
+    }
+    canvas->view.zoom=1;canvas->view.offset={canvas->GetClientSize().x*.5,canvas->GetClientSize().y*.5};
+    circuit().parts.front().rotation=0;rebuild(true,true);
+    inlineImage(false).SaveFile(wxString((folder/"erc-nor-no-overlap.png").wstring()),wxBITMAP_TYPE_PNG);
+    writeAtomic(folder/"erc-nor-no-overlap.logic.json",serialize(history.project));
+    for(int row=-1;row<=1;++row)for(int col=-1;col<=1;++col) {
+        if(!row && !col)continue;
+        Part nearby=nor;nearby.id=history.project.id("p");nearby.at={col*95.0,row*115.0};
+        nearby.rotation=(col-row+4)%4;circuit().parts.push_back(nearby);
+    }
+    rebuild(true,true);
+    for(Point offset:std::vector<Point>{{30,30},{double(canvas->GetClientSize().x-30),double(canvas->GetClientSize().y-30)},
+                                         {canvas->GetClientSize().x*.5,canvas->GetClientSize().y*.5}}) {
+        canvas->view.offset=offset;verifyMarkers();
+    }
+    inlineImage(false).SaveFile(wxString((folder/"erc-dense-no-overlap.png").wstring()),wxBITMAP_TYPE_PNG);
+    history.reset(halfAdder());current="main";canvas->selected.clear();rebuild(true,true);
+    if(!issues.empty() || !canvas->diagnosticMarkers().empty())
+        throw std::runtime_error("resolved ERC markers remained on canvas");
+    writeAtomic(folder/"LAYOUT-ERC-PASS.txt",
+        "Library above property inspector; compact hierarchy; add/delete subcircuit commands and undo; "
+        "direction/individual inversion/tool defaults; inline ERC colours, compact per-object warning/error icons, rule tooltips, "
+        "modeless list zoom/highlight; icon avoidance at five zooms/four rotations/dense layout/viewport edges; "
+        "no aggregate bubbles or minimap; clean export and model/simulation isolation passed.\n");
+    runRoutingSmoke(folder);
     writeAtomic(folder/"HIERARCHY-UI-PASS.txt","Live and paused navigation preserved simulator identity/time/ticks; nested instances kept independent registers/RAM; interface Input and structural edits read-only; internal button changed only its instance, without changing project definitions.\n");
     writeAtomic(folder / "EDITOR-UI-PASS.txt",
                 "Compact I/O, five state colours, table edits/validation/undo/live state, connection "
@@ -3377,7 +3940,9 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     writeAtomic(
         folder / "LOGIC-PASS.txt",
         "Digital-only GUI: default startup, complete icon catalog at 1x/2x, tree mappings, "
-        "component toolbar bindings, all canvas symbols/previews/state colours, stable terminal hit targets, "
+        "component toolbar bindings, single placement returns to Select, blank click does not duplicate, "
+        "selection-mode pin wiring/bends/cancel/undo/redo, zoomed-out center selection, "
+        "all canvas symbols/previews/state colours, stable terminal hit targets, "
         "inverter, animated pin hover/zoom/nearest endpoint/leave/export isolation, rendering, drag, branch "
         "split/cancel/undo, clipboard "
         "copy/paste/undo/redo, property input, save/load with Unicode path, simulation, truth table "

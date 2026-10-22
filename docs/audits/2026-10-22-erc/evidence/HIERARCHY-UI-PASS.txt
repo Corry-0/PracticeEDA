@@ -1,0 +1,1 @@
+Live and paused navigation preserved simulator identity/time/ticks; nested instances kept independent registers/RAM; interface Input and structural edits read-only; internal button changed only its instance, without changing project definitions.

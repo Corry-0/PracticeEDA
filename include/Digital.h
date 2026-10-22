@@ -79,6 +79,8 @@ void createComponent(Project &, const std::string &name, const std::vector<Compo
 std::string exportComponent(const Project &, const std::string &circuit);
 std::string importComponent(Project &, const std::string &bytes);
 std::vector<Port> ports(const Project &, const Part &);
+// 标准方向的主体尺寸；端口直接位于主体轮廓，旋转只作用于 ports() 的坐标。
+Point partSize(const Project &, const Part &);
 double partHeight(const Project &, const Part &);
 Point endpoint(const Project &, const Circuit &, const Endpoint &);
 std::vector<Point> wirePoints(const Project &, const Circuit &, const Wire &);

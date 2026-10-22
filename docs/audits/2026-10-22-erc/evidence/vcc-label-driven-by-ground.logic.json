@@ -1,0 +1,84 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "id": "j2",
+          "label": "VCC"
+        }
+      ],
+      "parts": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p1",
+          "kind": "Ground",
+          "label": "p1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p3",
+          "kind": "Output",
+          "label": "p3",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "j2",
+            ""
+          ],
+          "bends": [],
+          "id": "w4"
+        },
+        {
+          "a": [
+            "j2",
+            ""
+          ],
+          "b": [
+            "p3",
+            "A"
+          ],
+          "bends": [],
+          "id": "w5"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "数字逻辑工程",
+  "nextId": 6,
+  "version": 1
+}

@@ -1,0 +1,50 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p1",
+          "kind": "Input",
+          "label": "DUPLICATE",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p2",
+          "kind": "Output",
+          "label": "DUPLICATE",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": []
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "数字逻辑工程",
+  "nextId": 3,
+  "version": 1
+}

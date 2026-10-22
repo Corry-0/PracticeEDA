@@ -258,7 +258,7 @@ void geometryAndHierarchy() {
     auto gate = c.add("And");
     c.part(gate).rotation = 1;
     auto pins = ports(c.p, c.part(gate));
-    check(pins[0].id == "A" && pins[0].at.x == 10 && pins[0].at.y == -70,
+    check(pins[0].id == "A" && pins[0].at.x == 10 && pins[0].at.y == -40,
           "rotation preserves stable ID and rotates port geometry");
     Circuit child;
     child.name = "memory-block";
@@ -287,6 +287,60 @@ void geometryAndHierarchy() {
     check(newDefinition.interfaceLayout.size() == 1 &&
               newDefinition.part(newDefinition.interfaceLayout.begin()->first),
           "cross-project paste remaps custom interface IDs");
+}
+void compactSymbolGeometry() {
+    Project project;
+    for (const auto &info : library()) {
+        for (int variant = 0; variant < 3; ++variant) {
+            Part part;
+            part.kind = info.kind;
+            part.width = variant == 0 ? 1 : variant == 1 ? 8 : 32;
+            if (variant == 2) {
+                if (info.category == "逻辑门 (Gates)")
+                    part.params["inputs"] = 32;
+                if (part.kind == "Mux" || part.kind == "Demux" || part.kind == "Decoder" || part.kind == "Encoder")
+                    part.params["selectBits"] = 5;
+                if (part.kind == "Counter")
+                    part.params["loadable"] = 1;
+            }
+            const auto body = partSize(project, part);
+            const auto canonical = ports(project, part);
+            std::set<std::pair<double, double>> occupied;
+            for (const auto &pin : canonical) {
+                check(std::abs(pin.at.x) <= body.x / 2 + 1e-8 && std::abs(pin.at.y) <= body.y / 2 + 1e-8,
+                      "terminal stays inside body envelope: " + part.kind + ":" + pin.id);
+                check(occupied.emplace(pin.at.x, pin.at.y).second, "terminals do not overlap: " + part.kind);
+            }
+            for (int rotation = 1; rotation < 4; ++rotation) {
+                part.rotation = rotation;
+                const auto rotated = ports(project, part);
+                check(rotated.size() == canonical.size(), "rotation preserves terminal count");
+                for (size_t i = 0; i < rotated.size(); ++i) {
+                    auto expected = canonical[i].at;
+                    for (int turn = 0; turn < rotation; ++turn)
+                        expected = {-expected.y, expected.x};
+                    check(distance(expected, rotated[i].at) < 1e-8 && rotated[i].id == canonical[i].id &&
+                              rotated[i].width == canonical[i].width && rotated[i].output == canonical[i].output,
+                          "rotation preserves electrical identity and rotates body terminal: " + part.kind);
+                }
+            }
+        }
+    }
+    Part input, output;
+    input.kind = "Input";
+    output.kind = "Output";
+    check(distance(ports(project, input)[0].at, {14, 0}) < 1e-8 &&
+              distance(ports(project, output)[0].at, {-14, 0}) < 1e-8,
+          "I/O connection centers lie on the compact 28px body border");
+    // 主体缩短后，旧工程的端口 ID 及折点仍能保存、重载并保持逻辑连接。
+    auto demo = halfAdder();
+    auto &wire = demo.circuit("main").wires.front();
+    wire.bends = {{220, 140}, {220, 220}};
+    const auto saved = serialize(demo);
+    const auto restored = deserialize(saved);
+    check(serialize(restored) == saved, "compact geometry preserves saved endpoint IDs and bends");
+    check(truthTable(restored, "main").rows == truthTable(halfAdder(), "main").rows,
+          "body redesign preserves existing half-adder behavior");
 }
 void catalogAndRandom() {
     // 每一个已登记原语都必须能建网和求值；缺少求值分支不能靠库列表伪装成功。
@@ -320,6 +374,7 @@ int main() {
         timingAndMemory();
         switchesAndIo();
         geometryAndHierarchy();
+        compactSymbolGeometry();
         catalogAndRandom();
         std::cout << "advanced core: " << count << " checks passed\n";
         return 0;

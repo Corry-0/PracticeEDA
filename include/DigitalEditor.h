@@ -1,5 +1,6 @@
 #pragma once
 #include "Digital.h"
+#include "LogicRouting.h"
 #include "WxSupport.h"
 #include <wx/grid.h>
 #include <wx/treectrl.h>
@@ -35,6 +36,16 @@ class LogicEditor : public wxFrame {
     wxChoice *circuits;
     wxTextCtrl *search, *diagnosticDetail;
     wxGrid *properties;
+    wxStaticText *propertyHint;
+    wxButton *newCircuitButton, *deleteCircuitButton, *navigateUpButton, *editDefinitionButton;
+    wxDialog *diagnosticsWindow;
+    std::vector<int> diagnosticOrder;
+    std::map<std::string, Part> toolDefaults;
+    std::string inspectedContext;
+    std::string routingNotice;
+    void routingResult(const RerouteResult &);
+    void rerouteSelected();
+    void runRoutingSmoke(const std::filesystem::path &);
     int drawingStroke = 2;
     bool drawingFilled = false, syncingProperties = false;
     std::set<std::string> inspectedSelection;
@@ -51,6 +62,9 @@ class LogicEditor : public wxFrame {
     void apply();
     void refreshDiagnostics();
     void showDiagnostic(int index, bool locate);
+    void openDiagnostics(const std::vector<int> &focused = {});
+    std::string diagnosticText(const Issue &) const;
+    std::optional<std::pair<std::string, Point>> visibleDiagnostic(const Issue &) const;
     void change(const std::function<void()> &action);
     void showReport(const std::string &title, const std::string &text);
     void showTable(Table table);
@@ -58,6 +72,10 @@ class LogicEditor : public wxFrame {
     void pasteSelection();
     void removeSelection();
     void newCircuit();
+    bool canDeleteCircuit() const;
+    void deleteCircuit();
+    void renameCircuitTo(const std::string &);
+    Part placementPart() const;
     void newComponent();
     void saveComponent();
     void loadComponent();
@@ -113,6 +131,36 @@ class LogicCanvas : public wxPanel {
     void clearPinHover();
     void refreshPinHover();
     void drawPinHover(wxGraphicsContext &);
+    struct DiagnosticMarker {
+        std::string object;
+        Point anchor;
+        wxRect bounds;
+        std::vector<int> issues;
+        bool error = false;
+    };
+    std::vector<DiagnosticMarker> diagnosticMarkers() const;
+    void drawDiagnostics(wxGraphicsContext &);
+    bool handleDiagnosticClick(wxPoint);
+    void updateDiagnosticTooltip(Point);
+    wxString diagnosticTooltip;
+    mutable bool wireDisplayDirty = true;
+    bool previewDirty = true;
+    mutable std::map<std::string, std::vector<Point>> crossingGaps;
+    void updateWireDisplay() const;
+    WireRoute previewRoute;
+    Point previewMouse{1e10, 1e10};
+    std::string previewTarget;
+    int wireSegment = -1;
+    std::string draggedWire;
+    std::vector<Point> wireDragPoints;
+    Point wireDragDelta{1e10, 1e10};
+    std::vector<std::string> wireCandidates(Point) const;
+    bool cycleWire(Point, int direction = 1);
+    bool beginWireDrag(Point);
+    void updateWireDrag(Point);
+    const WireRoute &wirePreview();
+    void drawWire(wxGraphicsContext &, const Wire &, bool clean);
+    void drawWireHandles(wxGraphicsContext &);
     std::optional<Project> before;
     std::optional<Endpoint> start;
     std::vector<Point> bends;

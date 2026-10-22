@@ -56,6 +56,30 @@ std::vector<std::vector<int>> groups(const Part &p) {
 std::string portName(const Part &p) {
     return p.label.empty() ? p.id : p.label;
 }
+Point bodySize(const Part &p, size_t inputs, size_t outputs) {
+    const auto &k = p.kind;
+    if (k == "Input" || k == "Output")
+        return {28, 28};
+    if (k == "Constant" || k == "Clock" || k == "Button" || k == "LED" || k == "Probe" ||
+        k == "Power" || k == "Ground" || k == "PullUp" || k == "PullDown")
+        return {48, 48};
+    if (k == "Hex")
+        return {104, 54};
+    if (k == "LEDMatrix")
+        return {90, 90};
+    if (k == "SevenSegment")
+        return {80, 120};
+    if (k == "Not" || k == "Buffer" || k == "TriState")
+        return {80, 60};
+    if (gate(k))
+        return {80, std::max(60.0, 20.0 * inputs + 20)};
+    if (k == "Mux" || k == "Demux")
+        --inputs; // 选择端位于底边，不占用左侧数据端子的行。
+    double height = std::max(60.0, 20.0 * std::max(inputs, outputs) + 40);
+    if (k == "Splitter" || k == "Joiner")
+        return {80, height};
+    return {110, height};
+}
 json point(Point p) {
     return {p.x, p.y};
 }
@@ -325,12 +349,34 @@ std::vector<Port> ports(const Project &project, const Part &p) {
         }
     }
     int ni = 0, no = 0;
+    const bool bottomSelect = k == "Mux" || k == "Demux";
     for (auto &q : v)
-        (q.output ? no : ni)++;
+        if (!(bottomSelect && q.id == "S") && !(k == "TriState" && q.id == "EN"))
+            (q.output ? no : ni)++;
+    // bodySize() 接受全部输入数量，再为底边选择端留出空间。
+    const auto size = bodySize(p, ni + (bottomSelect ? 1 : 0), no);
     int ii = 0, oi = 0;
     for (auto &q : v) {
-        q.at = {q.output ? 70.0 : -70.0,
+        q.at = {q.output ? size.x / 2 : -size.x / 2,
                 20.0 * ((q.output ? oi++ : ii++) - ((q.output ? no : ni) - 1) * 0.5)};
+        const bool simple = gate(k) || k == "Not" || k == "Buffer" || k == "TriState" ||
+                            size.y <= 54 || k == "LEDMatrix";
+        if (!simple)
+            q.at.y += 10; // 功能块顶端留出独立的标题区。
+        if (k == "SevenSegment")
+            q.at.y = 12 * (ii - 1 - (ni - 1) * .5) + 8;
+        if ((bottomSelect && q.id == "S") || (k == "TriState" && q.id == "EN")) {
+            --ii;
+            q.at = {0, k == "TriState" ? 15.0 : size.y / 2 - 12 * 55.0 / 94};
+        }
+        if (!q.output && (k == "Or" || k == "Nor" || k == "Xor" || k == "Xnor")) {
+            double t = 2 * q.at.y / size.y;
+            q.at.x = -40 + 14 * (1 - t * t); // 与 OR 后沿二次曲线完全一致。
+        }
+        if (k == "Mux" || k == "Demux" || k == "Extender") {
+            if ((k == "Mux" && q.output) || (k != "Mux" && !q.output && q.id != "S"))
+                q.at.x = (q.output ? 1 : -1) * 39;
+        }
         if (p.kind == "Subcircuit") {
             const auto &layout = project.circuit(p.circuit).interfaceLayout;
             const auto it = layout.find(q.id);
@@ -343,11 +389,14 @@ std::vector<Port> ports(const Project &project, const Part &p) {
     return v;
 }
 double partHeight(const Project &p, const Part &part) {
+    return partSize(p, part).y;
+}
+Point partSize(const Project &p, const Part &part) {
     auto v = ports(p, part);
     size_t in = 0, out = 0;
     for (auto &q : v)
         (q.output ? out : in)++;
-    return std::max(60.0, 20.0 * std::max(in, out) + 20);
+    return bodySize(part, in, out);
 }
 Point endpoint(const Project &p, const Circuit &c, const Endpoint &e) {
     if (auto part = c.part(e.object))

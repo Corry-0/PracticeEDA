@@ -1,0 +1,119 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p1",
+          "kind": "Power",
+          "label": "p1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p2",
+          "kind": "Constant",
+          "label": "p2",
+          "params": {},
+          "rotation": 0,
+          "value": 1,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p3",
+          "kind": "Buffer",
+          "label": "p3",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "p4",
+          "kind": "Output",
+          "label": "p4",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "p2",
+            "Y"
+          ],
+          "b": [
+            "p3",
+            "A"
+          ],
+          "bends": [],
+          "id": "w5"
+        },
+        {
+          "a": [
+            "p3",
+            "Y"
+          ],
+          "b": [
+            "p1",
+            "Y"
+          ],
+          "bends": [],
+          "id": "w6"
+        },
+        {
+          "a": [
+            "p1",
+            "Y"
+          ],
+          "b": [
+            "p4",
+            "A"
+          ],
+          "bends": [],
+          "id": "w7"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "数字逻辑工程",
+  "nextId": 8,
+  "version": 1
+}

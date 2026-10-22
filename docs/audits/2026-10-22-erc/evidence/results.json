@@ -1,0 +1,493 @@
+{
+  "date": "2026-10-22",
+  "physicalMetadataSurvivesRoundtrip": {
+    "footprint": false,
+    "reference": false,
+    "unit": false,
+    "unitCount": false
+  },
+  "sameTopologyDriverStateChanges": {
+    "initial": [],
+    "oppositeValues": [
+      {
+        "message": "驱动冲突或非法运算 (E)",
+        "object": "p3",
+        "severity": "error"
+      },
+      {
+        "message": "驱动冲突或非法运算 (E)",
+        "object": "p4",
+        "severity": "error"
+      },
+      {
+        "message": "驱动冲突或非法运算 (E)",
+        "object": "p5",
+        "severity": "error"
+      },
+      {
+        "message": "驱动冲突或非法运算 (E)",
+        "object": "w8",
+        "severity": "error"
+      },
+      {
+        "message": "驱动冲突或非法运算 (E)",
+        "object": "w9",
+        "severity": "error"
+      }
+    ],
+    "sameValuesAgain": []
+  },
+  "scenarioCount": 26,
+  "scenarios": [
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "healthy-half-adder",
+      "panelWouldShowPass": true,
+      "purpose": "正常数字电路基线",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p2:Y": "0",
+        "p3:A": "0",
+        "p3:B": "0",
+        "p3:Y": "0",
+        "p4:A": "0",
+        "p4:B": "0",
+        "p4:Y": "0",
+        "p5:A": "0",
+        "p6:A": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "p1",
+          "severity": "warning"
+        }
+      ],
+      "expectedStructuralRejection": false,
+      "id": "unconnected-input",
+      "panelWouldShowPass": false,
+      "purpose": "未连接的必选输入端",
+      "settled": true,
+      "signals": {
+        "p1:A": "Z"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "p1",
+          "severity": "warning"
+        },
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "p2",
+          "severity": "warning"
+        },
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "w3",
+          "severity": "warning"
+        }
+      ],
+      "expectedStructuralRejection": false,
+      "id": "input-only-net",
+      "panelWouldShowPass": false,
+      "purpose": "两个输入相连但没有驱动",
+      "settled": true,
+      "signals": {
+        "p1:A": "Z",
+        "p2:A": "Z"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "unconnected-output",
+      "panelWouldShowPass": true,
+      "purpose": "单端输出网络，没有负载",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "dangling-wire-end",
+      "panelWouldShowPass": true,
+      "purpose": "已驱动输出连到导线自由端",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "wire-without-pins",
+      "panelWouldShowPass": true,
+      "purpose": "仅两个节点组成的悬空导线",
+      "settled": true,
+      "signals": {}
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "equal-push-pull-outputs",
+      "panelWouldShowPass": true,
+      "purpose": "两个普通缓冲器输出同电平直接相连",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p2:Y": "0",
+        "p3:A": "0",
+        "p3:Y": "0",
+        "p4:A": "0",
+        "p4:Y": "0",
+        "p5:A": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [
+        {
+          "message": "驱动冲突或非法运算 (E)",
+          "object": "p3",
+          "severity": "error"
+        },
+        {
+          "message": "驱动冲突或非法运算 (E)",
+          "object": "p4",
+          "severity": "error"
+        },
+        {
+          "message": "驱动冲突或非法运算 (E)",
+          "object": "p5",
+          "severity": "error"
+        },
+        {
+          "message": "驱动冲突或非法运算 (E)",
+          "object": "w8",
+          "severity": "error"
+        },
+        {
+          "message": "驱动冲突或非法运算 (E)",
+          "object": "w9",
+          "severity": "error"
+        }
+      ],
+      "expectedStructuralRejection": false,
+      "id": "opposite-push-pull-outputs",
+      "panelWouldShowPass": false,
+      "purpose": "两个普通缓冲器输出异电平直接相连",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p2:Y": "1",
+        "p3:A": "0",
+        "p3:Y": "E",
+        "p4:A": "1",
+        "p4:Y": "E",
+        "p5:A": "E"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [
+        {
+          "message": "驱动冲突或非法运算 (E)",
+          "object": "p1",
+          "severity": "error"
+        },
+        {
+          "message": "驱动冲突或非法运算 (E)",
+          "object": "p2",
+          "severity": "error"
+        },
+        {
+          "message": "驱动冲突或非法运算 (E)",
+          "object": "w3",
+          "severity": "error"
+        }
+      ],
+      "expectedStructuralRejection": false,
+      "id": "power-ground-short",
+      "panelWouldShowPass": false,
+      "purpose": "Power 与 Ground 的输出直接相连",
+      "settled": true,
+      "signals": {
+        "p1:Y": "E",
+        "p2:Y": "E"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "power-logic-output-tied",
+      "panelWouldShowPass": true,
+      "purpose": "Power 与普通逻辑输出同电平直连",
+      "settled": true,
+      "signals": {
+        "p1:Y": "1",
+        "p2:Y": "1",
+        "p3:A": "1",
+        "p3:Y": "1",
+        "p4:A": "1"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "vcc-label-driven-by-ground",
+      "panelWouldShowPass": true,
+      "purpose": "名为 VCC 的普通标签网络由 Ground 驱动；标签并非电源类型",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p3:A": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "mixed-power-labels",
+      "panelWouldShowPass": true,
+      "purpose": "VCC/GND 两个普通标签在同一网络，无专用电源域信息",
+      "settled": true,
+      "signals": {
+        "p1:Y": "1",
+        "p4:A": "1"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "similar-labels",
+      "panelWouldShowPass": true,
+      "purpose": "两个正常驱动的独立网络使用 CLK/clk 相似标签",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p3:A": "0",
+        "p6:Y": "0",
+        "p8:A": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "different-labels-one-net",
+      "panelWouldShowPass": true,
+      "purpose": "同一网络上存在两个不同普通标签，现实现接受其作为别名",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p4:A": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "floating-label",
+      "panelWouldShowPass": true,
+      "purpose": "孤立且没有同名远端连接的网络标签",
+      "settled": true,
+      "signals": {}
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [
+        {
+          "message": "总线位宽不匹配",
+          "object": "p1",
+          "severity": "error"
+        },
+        {
+          "message": "总线位宽不匹配",
+          "object": "p2",
+          "severity": "error"
+        },
+        {
+          "message": "总线位宽不匹配",
+          "object": "w3",
+          "severity": "error"
+        }
+      ],
+      "expectedStructuralRejection": false,
+      "id": "width-mismatch",
+      "panelWouldShowPass": false,
+      "purpose": "连接双方总线位宽不一致",
+      "settled": true,
+      "signals": {
+        "p1:Y": "EEEEEEEE",
+        "p2:A": "EEEEEEEE"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "optional-clear-unconnected",
+      "panelWouldShowPass": true,
+      "purpose": "可选 CLR 不接线的正常例外",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p2:CLK": "0",
+        "p2:CLR": "Z",
+        "p2:D": "0",
+        "p2:Q": "0",
+        "p3:A": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "optional-clear-wired-undriven",
+      "panelWouldShowPass": true,
+      "purpose": "CLR 已显式接线，但其网络没有驱动",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p2:CLK": "0",
+        "p2:CLR": "Z",
+        "p2:D": "0",
+        "p2:Q": "0",
+        "p3:A": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "p3",
+          "severity": "warning"
+        },
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "p4",
+          "severity": "warning"
+        },
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "w7",
+          "severity": "warning"
+        }
+      ],
+      "expectedStructuralRejection": false,
+      "id": "disabled-tristate",
+      "panelWouldShowPass": false,
+      "purpose": "三态输出关闭时，接收端为 Z；当前警告取决于运行态",
+      "settled": true,
+      "signals": {
+        "p1:Y": "1",
+        "p2:Y": "0",
+        "p3:A": "1",
+        "p3:EN": "0",
+        "p3:Y": "Z",
+        "p4:A": "Z"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "p1",
+          "severity": "warning"
+        },
+        {
+          "message": "输入悬空 / 高阻态 (Z)",
+          "object": "p1",
+          "severity": "warning"
+        }
+      ],
+      "expectedStructuralRejection": false,
+      "id": "ambiguous-pin-diagnostics",
+      "panelWouldShowPass": false,
+      "purpose": "同一与门两个输入均悬空，诊断是否给出具体脚名",
+      "settled": true,
+      "signals": {
+        "p1:A": "Z",
+        "p1:B": "Z",
+        "p1:Y": "X"
+      }
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "unused-invalid-electrical-definition",
+      "panelWouldShowPass": true,
+      "purpose": "未被实例化的定义内有悬空必选输入",
+      "settled": true,
+      "signals": {}
+    },
+    {
+      "acceptedByProjectValidate": true,
+      "diagnostics": [],
+      "expectedStructuralRejection": false,
+      "id": "duplicate-ordinary-labels",
+      "panelWouldShowPass": true,
+      "purpose": "两个普通器件的显示名称均为 U1；显示名称不等于实体位号",
+      "settled": true,
+      "signals": {
+        "p1:Y": "0",
+        "p2:A": "0",
+        "p2:Y": "0",
+        "p3:A": "0",
+        "p3:Y": "0"
+      }
+    },
+    {
+      "acceptedByProjectValidate": false,
+      "expectedStructuralRejection": true,
+      "id": "duplicate-interface-labels",
+      "purpose": "重复输入/输出接口名称属于结构校验",
+      "rejection": "输入输出名称不能重复"
+    },
+    {
+      "acceptedByProjectValidate": false,
+      "expectedStructuralRejection": true,
+      "id": "invalid-wire-endpoint",
+      "purpose": "引用不存在的对象/引脚属于结构校验",
+      "rejection": "无效的连接端点：missing:A"
+    },
+    {
+      "acceptedByProjectValidate": false,
+      "expectedStructuralRejection": true,
+      "id": "missing-subcircuit-definition",
+      "purpose": "子电路引用不存在的定义属于结构校验",
+      "rejection": "子电路不存在：missing"
+    },
+    {
+      "acceptedByProjectValidate": false,
+      "expectedStructuralRejection": true,
+      "id": "recursive-subcircuit",
+      "purpose": "递归定义属于结构校验",
+      "rejection": "子电路递归引用：main"
+    }
+  ],
+  "scope": "Behavior audit, not an ERC conformance pass",
+  "unexpectedExecutionFailures": 0
+}

@@ -1,0 +1,28 @@
+Internal ctest changing into directory: D:/zongshe/ElectronicComponent_Practice-/build
+Test project D:/zongshe/ElectronicComponent_Practice-/build
+      Start  1: digital_logic_tests
+ 1/11 Test  #1: digital_logic_tests ..............   Passed    0.02 sec
+      Start  2: component_netlist_tests
+ 2/11 Test  #2: component_netlist_tests ..........   Passed    0.12 sec
+      Start  3: circ_import_tests
+ 3/11 Test  #3: circ_import_tests ................   Passed    0.05 sec
+      Start  4: shape_tests
+ 4/11 Test  #4: shape_tests ......................   Passed    0.02 sec
+      Start  5: analysis_tests
+ 5/11 Test  #5: analysis_tests ...................   Passed    0.17 sec
+      Start  6: advanced_core_tests
+ 6/11 Test  #6: advanced_core_tests ..............   Passed    0.03 sec
+      Start  7: circ_exchange_tests
+ 7/11 Test  #7: circ_exchange_tests ..............   Passed    0.19 sec
+      Start  8: pcb_export_tests
+ 8/11 Test  #8: pcb_export_tests .................   Passed    0.02 sec
+      Start  9: netlist_format_tests
+ 9/11 Test  #9: netlist_format_tests .............   Passed    0.10 sec
+      Start 10: logisim_exchange_validation
+10/11 Test #10: logisim_exchange_validation ......   Passed    5.86 sec
+      Start 11: kicad_pcb_validation
+11/11 Test #11: kicad_pcb_validation .............   Passed    0.38 sec
+
+100% tests passed, 0 tests failed out of 11
+
+Total Test time (real) =   6.97 sec

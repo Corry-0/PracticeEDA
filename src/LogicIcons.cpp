@@ -1,5 +1,6 @@
 // 把原始图像数组编译进可执行文件；运行时不依赖任何资源文件。
 #include "LogicIcons.h"
+#include "LogicSymbols.h"
 #include "WxSupport.h"
 #include "wxwidgets/copy_2x_png.c"
 #include "wxwidgets/copy_png.c"
@@ -28,6 +29,33 @@
 
 namespace eda::logic {
 namespace {
+// 元件库与画布共用主体及端口坐标，避免图标仍显示已移除的外伸引线。
+wxBitmap componentIcon(const std::string &kind, int size) {
+    wxBitmap bitmap(size, size, 32);
+    wxMemoryDC dc(bitmap);
+    dc.SetBackground(*wxWHITE_BRUSH);
+    dc.Clear();
+    {
+        std::unique_ptr<wxGraphicsContext> g(wxGraphicsContext::Create(dc));
+        if (!g)
+            throw std::runtime_error("无法绘制数字元件图标");
+        Project project;
+        Part part;
+        part.kind = kind;
+        if (kind == "Subcircuit")
+            part.circuit = "main";
+        if (kind == "Splitter" || kind == "Joiner" || kind == "Hex")
+            part.width = 4;
+        auto body = partSize(project, part);
+        const double scale = (size - 6.0 * size / 32) / std::max(body.x, body.y);
+        g->Translate(size / 2.0, size / 2.0);
+        g->Scale(scale, scale);
+        drawSymbol(*g, project, part, [](const Port &pin) { return Signal::number(0, pin.width); },
+                   false, false, false, false);
+    }
+    dc.SelectObject(wxNullBitmap);
+    return bitmap;
+}
 wxBitmap draw(const std::string &kind, int size) {
     wxBitmap bitmap(size, size, 32);
     wxMemoryDC dc(bitmap);
@@ -51,7 +79,16 @@ wxBitmap draw(const std::string &kind, int size) {
             g->SetBrush(*wxWHITE_BRUSH);
             g->DrawEllipse(24, 13, 6, 6);
         };
-        if (kind == "And" || kind == "Nand") {
+        if (kind == "AddCircuit" || kind == "DeleteCircuit") {
+            g->SetPen(wxPen(wxColour(kind == "AddCircuit" ? "#168344" : "#cf3746"), 3.8));
+            if (kind == "AddCircuit") {
+                line(6, 16, 26, 16);
+                line(16, 6, 16, 26);
+            } else {
+                line(8, 8, 24, 24);
+                line(8, 24, 24, 8);
+            }
+        } else if (kind == "And" || kind == "Nand") {
             auto p = g->CreatePath();
             p.MoveToPoint(8, 6);
             p.AddLineToPoint(16, 6);
@@ -191,6 +228,9 @@ wxBitmap draw(const std::string &kind, int size) {
 }
 } // namespace
 wxBitmapBundle icon(const std::string &kind) {
+    if (kind != "Text" && (kind == "Subcircuit" ||
+        std::any_of(library().begin(), library().end(), [&](const PartInfo &info) { return info.kind == kind; })))
+        return wxBitmapBundle::FromBitmaps(componentIcon(kind, 32), componentIcon(kind, 64));
 #define SAMPLE_PNG(key, name)                                                                                \
     if (kind == key)                                                                                         \
     return wxBitmapBundle::FromBitmaps(wxBitmap::NewFromPNGData(name##_png, sizeof(name##_png)),             \

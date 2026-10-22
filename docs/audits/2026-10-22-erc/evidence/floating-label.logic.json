@@ -1,0 +1,26 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [
+        {
+          "at": [
+            0.0,
+            0.0
+          ],
+          "id": "j1",
+          "label": "UNUSED_NET"
+        }
+      ],
+      "parts": [],
+      "shapes": [],
+      "wires": []
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "数字逻辑工程",
+  "nextId": 2,
+  "version": 1
+}

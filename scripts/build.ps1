@@ -43,7 +43,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Core regression tests failed.' }
 if ($GuiTest) {
     # Remove only stale result markers so a previous passing run cannot hide a new failure.
     $edaQa = Join-Path $edaBuild ('qa-' + $Configuration.ToLowerInvariant())
-    foreach ($edaMarker in @('PASS.txt', 'LOGIC-PASS.txt', 'SHAPES-PASS.txt', 'EDITOR-UI-PASS.txt', 'HIERARCHY-UI-PASS.txt', 'FAILED.txt')) {
+    foreach ($edaMarker in @('PASS.txt', 'LOGIC-PASS.txt', 'SHAPES-PASS.txt', 'EDITOR-UI-PASS.txt', 'HIERARCHY-UI-PASS.txt', 'SYMBOLS-PASS.txt', 'LAYOUT-ERC-PASS.txt', 'ROUTING-PASS.txt', 'FAILED.txt')) {
         $edaMarkerPath = Join-Path $edaQa $edaMarker
         if (Test-Path -LiteralPath $edaMarkerPath) { Remove-Item -LiteralPath $edaMarkerPath }
     }
@@ -55,6 +55,9 @@ if ($GuiTest) {
         -not (Test-Path -LiteralPath (Join-Path $edaQa 'SHAPES-PASS.txt')) -or
         -not (Test-Path -LiteralPath (Join-Path $edaQa 'EDITOR-UI-PASS.txt')) -or
         -not (Test-Path -LiteralPath (Join-Path $edaQa 'HIERARCHY-UI-PASS.txt')) -or
+        -not (Test-Path -LiteralPath (Join-Path $edaQa 'SYMBOLS-PASS.txt')) -or
+        -not (Test-Path -LiteralPath (Join-Path $edaQa 'LAYOUT-ERC-PASS.txt')) -or
+        -not (Test-Path -LiteralPath (Join-Path $edaQa 'ROUTING-PASS.txt')) -or
         (Test-Path -LiteralPath (Join-Path $edaQa 'FAILED.txt'))) {
         throw "GUI smoke test failed. Inspect $edaQa"
     }
