@@ -10,12 +10,13 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
 set(EDA_CORE_HEADERS include/LogicSupport.h include/Digital.h include/LogicAnalysis.h include/PcbExport.h include/LogicRouting.h)
 set(EDA_CORE_SOURCES src/LogicSupport.cpp src/Digital.cpp src/CustomComponents.cpp src/Shapes.cpp src/CircImport.cpp src/LogicAnalysis.cpp src/PcbExport.cpp src/LogicRouting.cpp)
 set(EDA_GUI_HEADERS include/WxSupport.h include/LogicIcons.h include/LogicSymbols.h include/DigitalEditor.h)
-set(EDA_GUI_SOURCES src/App.cpp src/LogicIcons.cpp src/LogicSymbols.cpp src/DigitalEditor.cpp src/LogicEditorTools.cpp src/LogicDiagnostics.cpp src/LogicWireTools.cpp tests/editor_module_tests.cpp)
+set(EDA_GUI_SOURCES src/App.cpp src/LogicIcons.cpp src/LogicSymbols.cpp src/DigitalEditor.cpp src/LogicEditorTools.cpp src/LogicDiagnostics.cpp src/LogicWireTools.cpp src/ExperimentCases.cpp tests/editor_module_tests.cpp)
 set(EDA_DOCUMENTS README.md docs/VISUAL_STUDIO_CN.md docs/DIGITAL_LOGIC_CN.md
     docs/CUSTOM_COMPONENTS_NETLIST_CN.md docs/CIRC_IMPORT_CN.md docs/PCB_EXCHANGE_CN.md docs/CODE_GUIDE_CN.md docs/TEST_REPORT_CN.md docs/OPTIMIZATION_ACCEPTANCE_CN.md docs/ROUTING_CN.md resources/ICONS.md)
 set(EDA_EXAMPLES examples/half-adder.logic.json examples/bus-register.logic.json examples/defense-hierarchy.logic.json
     examples/hierarchical-adder.logic.json examples/half-adder.component.json examples/drawn-half-adder.component.json examples/circ-limited.circ
-    examples/half-adder-physical.net examples/half-adder-physical.kicad_pcb examples/half-adder-physical.mapping.json)
+    examples/half-adder-physical.net examples/half-adder-physical.kicad_pcb examples/half-adder-physical.mapping.json
+    examples/full-adder.logic.json examples/counter.logic.json examples/ram-read-write.logic.json)
 file(GLOB EDA_ICON_RESOURCES CONFIGURE_DEPENDS "resources/wxwidgets/*" "resources/reference/*")
 set_source_files_properties(${EDA_ICON_RESOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
 source_group("图标资源" FILES ${EDA_ICON_RESOURCES})
@@ -23,7 +24,7 @@ source_group("头文件" FILES ${EDA_CORE_HEADERS} ${EDA_GUI_HEADERS})
 source_group("源文件" FILES ${EDA_CORE_SOURCES} ${EDA_GUI_SOURCES})
 source_group("测试" FILES tests/editor_module_tests.cpp)
 source_group("源文件" FILES tests/digital_tests.cpp tests/component_netlist_tests.cpp tests/circ_import_tests.cpp tests/shape_tests.cpp
-    tests/advanced_core_tests.cpp tests/analysis_tests.cpp tests/pcb_export_tests.cpp)
+    tests/advanced_core_tests.cpp tests/analysis_tests.cpp tests/pcb_export_tests.cpp tests/experiment_case_tests.cpp)
 source_group("第三方文件" FILES third_party/json.hpp third_party/tinyxml2.h third_party/tinyxml2.cpp)
 source_group("文档" FILES ${EDA_DOCUMENTS})
 source_group("示例工程" FILES ${EDA_EXAMPLES})
@@ -58,6 +59,11 @@ if(EDA_BUILD_GUI)
   target_link_libraries(PracticeEDA PRIVATE logic_core ${wxWidgets_LIBRARIES})
   set_target_properties(PracticeEDA PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT PracticeEDA)
+  # 案例随可执行文件交付；从任意工作目录启动时都能读取。
+  add_custom_command(TARGET PracticeEDA POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:PracticeEDA>/examples"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${EDA_EXAMPLES} "$<TARGET_FILE_DIR:PracticeEDA>/examples"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 option(BUILD_TESTING "Build regression tests" ON)
 if(BUILD_TESTING)
@@ -101,6 +107,11 @@ if(BUILD_TESTING)
   target_include_directories(pcb_export_tests SYSTEM PRIVATE third_party)
   set_target_properties(pcb_export_tests PROPERTIES FOLDER "测试")
   add_test(NAME pcb_export_tests COMMAND pcb_export_tests "${CMAKE_CURRENT_BINARY_DIR}/qa-pcb/$<CONFIG>")
+  add_executable(experiment_case_tests tests/experiment_case_tests.cpp)
+  target_link_libraries(experiment_case_tests PRIVATE logic_core)
+  target_compile_definitions(experiment_case_tests PRIVATE LOGIC_EXAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples")
+  set_target_properties(experiment_case_tests PROPERTIES FOLDER "测试")
+  add_test(NAME experiment_case_tests COMMAND experiment_case_tests)
   find_package(Python3 QUIET COMPONENTS Interpreter)
   if(Python3_Interpreter_FOUND)
     add_test(NAME netlist_format_tests COMMAND "${Python3_EXECUTABLE}"

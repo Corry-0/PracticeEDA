@@ -14,7 +14,7 @@ class LogicEditor : public wxFrame {
     explicit LogicEditor(wxWindow *parent = nullptr);
     bool load(const wxString &path);
     bool save(bool as = false);
-    void runSmoke(const std::filesystem::path &folder);
+    void runSmoke(const std::filesystem::path &folder, bool experimentsOnly = false);
     void closeSmoke();
 
   private:
@@ -104,6 +104,9 @@ class LogicEditor : public wxFrame {
     void recentMenu();
     void exportBatch();
     void textDevice();
+    void showExperimentCases();
+    bool openExperimentCase(size_t index);
+    void runExperimentSmoke(const std::filesystem::path &folder);
     friend class LogicCanvas;
 };
 // 视口坐标与临时手势状态都放在这里；已提交的数据始终保存在工程模型中。

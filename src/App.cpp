@@ -13,11 +13,13 @@ class PracticeApp : public wxApp {
     void OnInitCmdLine(wxCmdLineParser &parser) override {
         wxApp::OnInitCmdLine(parser);
         parser.AddOption("", "smoke-test", "Run digital GUI integration checks in a directory");
+        parser.AddSwitch("", "experiment-cases-only", "Run only experiment GUI checks with --smoke-test");
         parser.AddSwitch("", "logic", "Digital editor (accepted for compatibility)");
         parser.AddParam("project", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_OPTIONAL);
     }
     bool OnCmdLineParsed(wxCmdLineParser &parser) override {
         parser.Found("smoke-test", &smoke);
+        experimentsOnly = parser.Found("experiment-cases-only");
         if (parser.GetParamCount())
             path = parser.GetParam(0);
         return wxApp::OnCmdLineParsed(parser);
@@ -42,7 +44,7 @@ class PracticeApp : public wxApp {
         if (!smoke.empty())
             CallAfter([frame, this] {
                 try {
-                    frame->runSmoke(eda::fsPath(smoke));
+                    frame->runSmoke(eda::fsPath(smoke), experimentsOnly);
                 } catch (const std::exception &e) {
                     smokeFailed = true;
                     try {
@@ -57,6 +59,7 @@ class PracticeApp : public wxApp {
 
   private:
     bool smokeFailed = false;
+    bool experimentsOnly = false;
     wxString path, smoke;
 };
 wxIMPLEMENT_APP(PracticeApp);
