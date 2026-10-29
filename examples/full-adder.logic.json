@@ -1,0 +1,33 @@
+{
+  "format": "PracticeEDA.logic", "version": 1,
+  "name": "实验案例：一位全加器", "main": "main", "nextId": 100,
+  "circuits": [{
+    "name": "main", "nodes": [],
+    "parts": [
+      {"id":"a","kind":"Input","label":"A","circuit":"","at":[100,130],"width":1,"value":0,"data":[]},
+      {"id":"b","kind":"Input","label":"B","circuit":"","at":[100,350],"width":1,"value":0,"data":[]},
+      {"id":"cin","kind":"Input","label":"Cin","circuit":"","at":[100,550],"width":1,"value":0,"data":[]},
+      {"id":"x1","kind":"Xor","label":"A XOR B","circuit":"","at":[380,140],"width":1,"value":0,"data":[]},
+      {"id":"g1","kind":"And","label":"A AND B","circuit":"","at":[380,360],"width":1,"value":0,"data":[]},
+      {"id":"x2","kind":"Xor","label":"Sum XOR","circuit":"","at":[700,140],"width":1,"value":0,"data":[]},
+      {"id":"g2","kind":"And","label":"Carry AND","circuit":"","at":[700,370],"width":1,"value":0,"data":[]},
+      {"id":"or","kind":"Or","label":"Carry OR","circuit":"","at":[1000,360],"width":1,"value":0,"data":[]},
+      {"id":"sum","kind":"Output","label":"Sum","circuit":"","at":[1200,140],"width":1,"value":0,"data":[]},
+      {"id":"cout","kind":"Output","label":"Cout","circuit":"","at":[1200,360],"width":1,"value":0,"data":[]}
+    ],
+    "wires": [
+      {"id":"w1","a":["a","Y"],"b":["x1","A"],"bends":[]},
+      {"id":"w2","a":["b","Y"],"b":["x1","B"],"bends":[[260,350],[260,150]]},
+      {"id":"w3","a":["a","Y"],"b":["g1","A"],"bends":[[220,130],[220,350]]},
+      {"id":"w4","a":["b","Y"],"b":["g1","B"],"bends":[[290,350],[290,370]]},
+      {"id":"w5","a":["x1","Y"],"b":["x2","A"],"bends":[[560,140],[560,130]]},
+      {"id":"w6","a":["cin","Y"],"b":["x2","B"],"bends":[[600,550],[600,150]]},
+      {"id":"w7","a":["x1","Y"],"b":["g2","A"],"bends":[[530,140],[530,360]]},
+      {"id":"w8","a":["cin","Y"],"b":["g2","B"],"bends":[[570,550],[570,380]]},
+      {"id":"w9","a":["g1","Y"],"b":["or","A"],"bends":[[490,360],[490,260],[870,260],[870,350]]},
+      {"id":"w10","a":["g2","Y"],"b":["or","B"],"bends":[]},
+      {"id":"w11","a":["x2","Y"],"b":["sum","A"],"bends":[]},
+      {"id":"w12","a":["or","Y"],"b":["cout","A"],"bends":[]}
+    ]
+  }]
+}

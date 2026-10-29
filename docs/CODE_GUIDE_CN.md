@@ -13,6 +13,8 @@
 | `include/PcbExport.h` / `src/PcbExport.cpp` | 受限实体芯片/封装映射、标准网表与配套未布线板 |
 | `include/DigitalEditor.h` / `src/DigitalEditor.cpp` | 窗口与画布状态、菜单、输入校验、撤销事务、拖拽和连线、GUI 回归 |
 | `src/LogicEditorTools.cpp` | 十六进制内存窗口、接口坐标、连续 CSV、最近工程与批量图片 |
+| `src/ExperimentCases.cpp` | 案例目录、说明窗口、候选工程校验、从案例创建副本、GUI 回归 |
+| `tests/experiment_case_tests.cpp` | 六个案例的真值表、寄存器边沿、计数器回绕/使能/清零和 RAM 读写验证 |
 | `include/LogicSupport.h` / `src/LogicSupport.cpp` | 模型坐标、视口变换、端点与折线、限额读取、原子文件替换 |
 | `include/WxSupport.h` | UTF-8 与 wxString 转换，Windows UTF-16 路径 |
 | `include/LogicSymbols.h` / `src/LogicSymbols.cpp` | 画布、放置预览、PNG 导出共享的矢量绘图 |
