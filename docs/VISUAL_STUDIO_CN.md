@@ -4,7 +4,7 @@
 2. 选择 Debug/x64 或 Release/x64，将 PracticeEDA 设为启动项目。
 3. Ctrl+Shift+B 编译，F5 直接进入数字电路编辑器。
 
-解决方案包含数字电路应用 PracticeEDA、数字核心库 logic_core、逻辑/组件/导入/图形/分析/交换/PCB等八个核心测试程序，以及 CMake 辅助目标。存在Python和指定外部工具时，CTest还注册独立格式、Logisim与KiCad验证。
+解决方案包含数字电路应用 PracticeEDA、数字核心库 logic_core、逻辑/组件/导入/图形/进阶核心/分析/PCB/布线八个核心测试程序，以及 CMake 辅助目标。存在 Python 和指定外部工具时，CTest 还注册独立网表格式与 KiCad 验证。GUI 冒烟测试另含模块场景，当前已知失败项见 [测试报告](TEST_REPORT_CN.md)。
 
 头文件位于 `include/`，源文件位于 `src/`；图标资源显示在“图标资源”筛选器下，来源于 `resources/wxwidgets/`，编译后不依赖外部资源路径。原生工程示例为 `.logic.json`，另有 `.component.json`、`.circ` 和受限实体PCB映射示例。
 

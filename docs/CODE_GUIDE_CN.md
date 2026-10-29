@@ -9,10 +9,10 @@
 | `src/Digital.cpp` | 内置库、端口布局、校验、序列化、剪贴板、历史、层次展平、事件驱动、网表、真值表 |
 | `src/CustomComponents.cpp` | 创建接口、依赖闭包、可移植元件文件、名称/ID 重映射、事务式导入 |
 | `include/LogicAnalysis.h` / `src/LogicAnalysis.cpp` | 真值表校验、Quine–McCluskey 化简、覆盖搜索、卡诺图、生成电路与独立仿真验证 |
-| `include/CircExchange.h` / `src/CircImport.cpp` / `src/CircExport.cpp` | Logisim XML 交换、共用器件几何、层次定义和无法保持语义时的明确诊断 |
+| `src/CircImport.cpp` | Logisim XML 导入、器件几何、层次定义和未支持对象的诊断 |
 | `include/PcbExport.h` / `src/PcbExport.cpp` | 受限实体芯片/封装映射、标准网表与配套未布线板 |
 | `include/DigitalEditor.h` / `src/DigitalEditor.cpp` | 窗口与画布状态、菜单、输入校验、撤销事务、拖拽和连线、GUI 回归 |
-| `src/LogicEditorTools.cpp` | 十六进制内存窗口、接口坐标、连续 CSV、最近工程、打印与批量图片 |
+| `src/LogicEditorTools.cpp` | 十六进制内存窗口、接口坐标、连续 CSV、最近工程与批量图片 |
 | `include/LogicSupport.h` / `src/LogicSupport.cpp` | 模型坐标、视口变换、端点与折线、限额读取、原子文件替换 |
 | `include/WxSupport.h` | UTF-8 与 wxString 转换，Windows UTF-16 路径 |
 | `include/LogicSymbols.h` / `src/LogicSymbols.cpp` | 画布、放置预览、PNG 导出共享的矢量绘图 |
@@ -21,7 +21,8 @@
 | `tests/advanced_core_tests.cpp` / `tests/analysis_tests.cpp` | 参数、独立时钟、实际实例状态、双向开关与弱驱动、组合分析闭环 |
 | `tests/component_netlist_tests.cpp` | 自定义元件 API、错误回滚、实例隔离、导出与仿真一致性 |
 | `tests/verify_netlists.py` | 独立解析 S-expression，逐网络、逐引脚比对 JSON |
-| `tests/circ_exchange_tests.cpp` / `tests/verify_logisim_exchange.py` | 原生往返和实际Logisim组合/时序输出比较 |
+| `tests/circ_import_tests.cpp` | Logisim 导入、连线几何、参数和未支持对象回归 |
+| `tests/editor_module_tests.cpp` / `scripts/run_module_audit.py` | 真实菜单及窗口模块检查、Debug/Release 日志和失败记录 |
 | `tests/pcb_export_tests.cpp` / `tests/verify_pcb_exchange.py` | 实体映射检查及实际KiCad板加载/逐焊盘核对 |
 | `CMakeLists.txt` / `CMakePresets.json` | 核心库与 GUI 分离、VS 配置、测试注册和安装文件 |
 | `scripts/build.ps1` / `scripts/DigitalLogic.cmd` | 构建测试打包 / 启动分发版或本地 Release 版 |

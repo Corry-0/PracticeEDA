@@ -4,9 +4,9 @@
 
 ## 导出与使用
 
-打开半加器，选择“文件 → 导出网表”，第三种格式为“KiCad实体映射网表”。同时生成标准 S-expression `.net`、对应 `.kicad_pcb` 和 `.mapping.json`。若导出名为 `circuit.physical.net`，对应文件为 `circuit.physical.kicad_pcb` 与 `circuit.physical.mapping.json`。
+打开半加器，选择“文件 → 导出 → KiCad PCB”，保存 `circuit.kicad_pcb`，程序同时生成标准 S-expression 网表 `circuit.net` 和引脚映射 `circuit.mapping.json`。顶部工具栏的“导出”下拉菜单提供相同入口。导出前先检查实体器件是否支持，配套文件已存在时提示是否覆盖。
 
-可直接用 KiCad PCB 编辑器打开配套板文件，无需依赖本机封装库才能显示已有焊盘。示例见 `examples/half-adder-physical.*`；答辩材料 `sample/pcb/` 还保留加载结果和独立网络比对证据。
+可直接用 KiCad PCB 编辑器打开 `.kicad_pcb` 板文件，无需依赖本机封装库才能显示已有焊盘。`.net` 为实体连接网表，`.mapping.json` 记录逻辑实例与实际焊盘的对应关系；三个文件使用同一文件名前缀。示例见 `examples/half-adder-physical.*`；答辩材料 `sample/pcb/` 还保留加载结果和独立网络比对证据。
 
 板上元件先按网格放置，没有铜线和过孔布线。正式设计需继续布局、布线、电源/信号检查和 DRC，不能直接宣称制造通过。
 

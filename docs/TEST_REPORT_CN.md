@@ -1,5 +1,13 @@
 # PracticeEDA 0.5 功能与回归测试报告
 
+2026-10-29 上传前复核：Debug/x64、Release/x64 均编译通过，各自 10/10 CTest 通过。新增 `tests/editor_module_tests.cpp` 的 26 项模块场景在两个配置下均为 23 项通过、3 项失败：M21 的不同电路名经文件名清理后可能覆盖同一 PNG；M22 的非空半加器模板未标记为未保存；M26 的 HEX 重复次数 `2x*2a` 未被拒绝。GUI 冒烟测试因此返回非零退出码，这三项仍待修复。可用 `python -X utf8 scripts/run_module_audit.py --build-dir build --report-dir build/module-audit --stage current` 复现；每次运行使用新的 `--stage` 名称。
+
+2026-10-29 更新：移除 Logisim `.circ` 导出、打印和打印预览，导入/导出统一进入文件菜单及顶部相邻下拉按钮。Release 构建通过；当前 10/10 CTest 通过，GUI 的 LOGIC、SHAPES、EDITOR-UI、HIERARCHY-UI、SYMBOLS、LAYOUT-ERC、ROUTING 七组标志均通过。GUI 检查包含菜单/工具栏分组一致性、已删入口消失、原生保存、`.circ` 导入及源文件保护、自定义元件、PNG、网表、仿真和布线。Logisim 导出专用的 `circ_exchange_tests` 与 `logisim_exchange_validation` 已移除；以下 2026-10-08 结果为历史记录。
+
+同日导出入口调整：逻辑网表 JSON 与 KiCad PCB 使用独立菜单和单一保存格式，默认文件名分别为 `circuit.json`、`circuit.kicad_pcb`；PCB 同时生成 `.net` 和 `.mapping.json`。Release 重新构建、10/10 CTest 和七组 GUI 回归通过，嵌套自定义半加器导出 JSON 及 PCB/网表/映射文件后，原仿真时间和事件队列保持不变。
+
+本机 KiCad 10.0.0 另行读取本次 `build/qa-release/custom-half-adder.kicad_pcb` 并导出 IPC-D-356；9 个实体元件、6 个网络、36 个已连接焊盘与配套 `.net`、`.mapping.json` 全部一致。该验证读取的是原生 PCB 文件，未测试 GUI 直接导入 `.net`。
+
 日期：2026-10-08。环境：Windows、Visual Studio 2022 x64、C++17、wxWidgets静态库；外部验证使用本地经典Logisim 2.7.1和KiCad CLI 10.0.7。所有下列结果均来自本日实际执行，原始日志保存在docs/defense/evidence。
 
 |构建配置|CTest|窗口集成|结果|

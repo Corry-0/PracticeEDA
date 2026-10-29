@@ -79,7 +79,16 @@ wxBitmap draw(const std::string &kind, int size) {
             g->SetBrush(*wxWHITE_BRUSH);
             g->DrawEllipse(24, 13, 6, 6);
         };
-        if (kind == "AddCircuit" || kind == "DeleteCircuit") {
+        if (kind == "Import" || kind == "Export") {
+            g->DrawRoundedRectangle(5, 4, 22, 24, 3);
+            g->SetPen(wxPen(wxColour(kind == "Import" ? "#168344" : "#2468aa"), 2.8));
+            const double from = kind == "Import" ? 5 : 27;
+            const double to = kind == "Import" ? 23 : 9;
+            const double back = kind == "Import" ? -6 : 6;
+            line(from, 16, to, 16);
+            line(to + back, 10, to, 16);
+            line(to + back, 22, to, 16);
+        } else if (kind == "AddCircuit" || kind == "DeleteCircuit") {
             g->SetPen(wxPen(wxColour(kind == "AddCircuit" ? "#168344" : "#cf3746"), 3.8));
             if (kind == "AddCircuit") {
                 line(6, 16, 26, 16);

@@ -5,8 +5,6 @@
 #include <wx/dirdlg.h>
 #include <wx/choicdlg.h>
 #include <wx/textdlg.h>
-#include <wx/print.h>
-#include <wx/printdlg.h>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -24,14 +22,6 @@ uint32_t hexValue(const wxString &value) {
     if(used!=text.size() || result>UINT32_MAX) throw std::runtime_error("请输入有效的十六进制数（不超过 FFFFFFFF）");
     return uint32_t(result);
 }
-class CircuitPrintout : public wxPrintout {
-    std::function<bool(wxDC*)> draw;
-  public:
-    CircuitPrintout(const wxString &title,std::function<bool(wxDC*)> fn):wxPrintout(title),draw(std::move(fn)) {}
-    bool OnPrintPage(int page) override { return page==1 && GetDC() && draw(GetDC()); }
-    bool HasPage(int page) override { return page==1; }
-    void GetPageInfo(int *min,int *max,int *from,int *to) override { *min=*max=*from=*to=1; }
-};
 }
 
 void LogicEditor::memoryEditor(bool runtime) {
@@ -205,7 +195,7 @@ void LogicEditor::monitorSignals() {
 void LogicEditor::rememberFile(const std::string &path) {
     recentFiles.erase(std::remove(recentFiles.begin(),recentFiles.end(),path),recentFiles.end());
     recentFiles.insert(recentFiles.begin(),path); if(recentFiles.size()>8) recentFiles.resize(8);
-    wxConfig config("PracticeEDA");
+    auto &config = *wxConfigBase::Get();
     for(size_t i=0;i<8;++i) config.Write(U("recent/"+std::to_string(i)),i<recentFiles.size()?U(recentFiles[i]):wxString{});
     config.Flush();
 }
@@ -240,46 +230,6 @@ void LogicEditor::exportBatch() {
         }
         restore();
     } catch(...) { restore(); throw; }
-}
-
-void LogicEditor::printCircuit(bool preview) {
-    canvas->cancel();
-    auto draw=[this](wxDC *dc) {
-        Point lo{1e9,1e9},hi{-1e9,-1e9};
-        auto add=[&](Point point) { lo.x=std::min(lo.x,point.x);lo.y=std::min(lo.y,point.y);
-            hi.x=std::max(hi.x,point.x);hi.y=std::max(hi.y,point.y); };
-        for(const auto &part:circuit().parts) {
-            auto local=[&](Point point){for(int turn=0;turn<part.rotation;++turn)point={-point.y,point.x};add(part.at+point);};
-            local({-100,-partHeight(history.project,part)/2-40});
-            local({100,partHeight(history.project,part)/2+40});
-            for(const auto &pin:ports(history.project,part)) add(part.at+pin.at);
-            if(part.kind=="Subcircuit")for(const auto &shape:history.project.circuit(part.circuit).shapes)if(shape.appearance){
-                auto box=shapeBounds(shape);local(box.first-Point{30,30});local(box.second+Point{30,30});
-            }
-        }
-        for(const auto &wire:circuit().wires) for(const auto &point:wirePoints(history.project,circuit(),wire)) add(point);
-        for(const auto &shape:circuit().shapes) if(shape.appearance==canvas->appearance) {
-            auto bounds=shapeBounds(shape); add(bounds.first);add(bounds.second);
-        }
-        if(lo.x>hi.x) { lo={0,0};hi={500,300}; }
-        auto size=dc->GetSize(); auto extent=hi-lo; auto saved=canvas->view;
-        canvas->view.zoom=std::min((size.x-120)/std::max(1.0,extent.x),(size.y-160)/std::max(1.0,extent.y));
-        canvas->view.offset=Point{60,80}-lo*canvas->view.zoom;
-        std::unique_ptr<wxGraphicsContext> graphics(wxGraphicsContext::CreateFromUnknownDC(*dc));
-        if(!graphics) { canvas->view=saved; return false; }
-        canvas->render(*graphics,size,true); canvas->view=saved; return true;
-    };
-    wxPrintDialogData data; data.GetPrintData().SetOrientation(wxLANDSCAPE);
-    if(preview) {
-        auto result=new wxPrintPreview(new CircuitPrintout(U(current),draw),new CircuitPrintout(U(current),draw),&data);
-        if(!result->IsOk()) { delete result; throw std::runtime_error("无法创建打印预览，请检查打印机设置"); }
-        auto frame=new wxPreviewFrame(result,this,U("电路打印预览"),wxDefaultPosition,{1100,800});
-        frame->Initialize(); frame->Show();
-    } else {
-        wxPrinter printer(&data); CircuitPrintout printout(U(current),draw);
-        if(!printer.Print(this,&printout,true) && wxPrinter::GetLastError()==wxPRINTER_ERROR)
-            throw std::runtime_error("打印失败，请检查打印机设置");
-    }
 }
 
 void LogicEditor::textDevice() {

@@ -46,6 +46,7 @@ class LogicEditor : public wxFrame {
     void routingResult(const RerouteResult &);
     void rerouteSelected();
     void runRoutingSmoke(const std::filesystem::path &);
+    void runModuleSmoke(const std::filesystem::path &);
     int drawingStroke = 2;
     bool drawingFilled = false, syncingProperties = false;
     std::set<std::string> inspectedSelection;
@@ -79,7 +80,8 @@ class LogicEditor : public wxFrame {
     void newComponent();
     void saveComponent();
     void loadComponent();
-    void exportNetlist();
+    void exportLogicNetlist();
+    void exportKiCadPcb();
     void encapsulate();
     void renameCircuit();
     void tick();
@@ -101,7 +103,6 @@ class LogicEditor : public wxFrame {
     void rememberFile(const std::string &path);
     void recentMenu();
     void exportBatch();
-    void printCircuit(bool preview);
     void textDevice();
     friend class LogicCanvas;
 };

@@ -1,6 +1,7 @@
 #include "DigitalEditor.h"
 #include <wx/cmdline.h>
 #include <wx/imagpng.h>
+#include <wx/fileconf.h>
 
 // 唯一的应用入口；冒烟测试失败会变成非零进程退出码，供 build.ps1 判断。
 class PracticeApp : public wxApp {
@@ -25,6 +26,13 @@ class PracticeApp : public wxApp {
         if (!wxApp::OnInit())
             return false;
         SetAppName("PracticeEDA");
+        if (!smoke.empty()) {
+            auto folder = eda::fsPath(smoke);
+            std::filesystem::create_directories(folder);
+            // 测试期间的最近文件等设置仅写入证据目录，避免污染用户配置。
+            wxConfigBase::Set(new wxFileConfig("PracticeEDA", wxEmptyString,
+                wxString((folder / "settings.ini").wstring()), wxEmptyString, wxCONFIG_USE_LOCAL_FILE));
+        }
         wxImage::AddHandler(new wxPNGHandler());
         auto frame = new eda::logic::LogicEditor();
         SetTopWindow(frame);

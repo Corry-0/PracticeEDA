@@ -3,7 +3,6 @@
 #include "LogicIcons.h"
 #include "LogicSymbols.h"
 #include "LogicAnalysis.h"
-#include "CircExchange.h"
 #include "PcbExport.h"
 #include <fstream>
 #include <iomanip>
@@ -19,8 +18,6 @@
 #include <wx/splitter.h>
 #include <wx/dirdlg.h>
 #include <wx/choicdlg.h>
-#include <wx/print.h>
-#include <wx/printdlg.h>
 #include <wx/config.h>
 #include <wx/bmpbuttn.h>
 
@@ -48,7 +45,8 @@ enum {
     L_RENAME,
     L_HELP,
     L_CSV,
-    L_NETLIST,
+    L_NETLIST_JSON,
+    L_PCB,
     L_NEW_COMPONENT,
     L_SAVE_COMPONENT,
     L_LOAD_COMPONENT,
@@ -60,7 +58,7 @@ enum {
     L_ELLIPSE,
     L_CIRCLE,
     L_GUIDE, L_UP, L_EDIT_DEFINITION, L_MEMORY_INITIAL, L_MEMORY_RUNTIME, L_PIN_LAYOUT,
-    L_MONITOR, L_RECENT, L_TEMPLATE, L_BATCH_PNG, L_PRINT, L_PREVIEW, L_EXPORT_CIRC,
+    L_MONITOR, L_RECENT, L_TEMPLATE, L_BATCH_PNG, L_IMPORT_CIRC, L_IMPORT_MENU, L_EXPORT_MENU,
     L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE, L_DIAGNOSTICS, L_REROUTE,
     L_RECENT_FIRST = wxID_HIGHEST + 900
 };
@@ -145,21 +143,41 @@ LogicEditor::LogicEditor(wxWindow *parent)
             m->Append(i.first, U(i.second));
         bar->Append(m, U(title));
     };
-    menu("文件", {{wxID_NEW, "新建数字工程\tCtrl+N"},
-                  {wxID_OPEN, "打开…\tCtrl+O"},
-                  {L_DEMO, "打开半加器示例"},
-                  {wxID_SAVE, "保存\tCtrl+S"},
-                  {L_SAVE_AS, "另存为…\tCtrl+Shift+S"},
-                  {L_PNG, "导出完整电路 PNG…"},
-                  {L_CSV, "导出最近分析 CSV…"},
-                  {L_NETLIST, "导出网表…"},
-                  {L_EXPORT_CIRC, "导出 Logisim 2.7 .circ…"},
-                  {L_TEMPLATE, "从模板新建…"},
-                  {L_RECENT, "最近打开"},
-                  {L_BATCH_PNG, "批量导出子电路 PNG…"},
-                  {L_PREVIEW, "打印预览…"},
-                  {L_PRINT, "打印…"},
-                  {wxID_EXIT, "关闭"}});
+    // 菜单和工具栏各自拥有菜单对象，共用入口定义及同一组命令处理器。
+    auto importMenu = [] {
+        auto m = new wxMenu();
+        m->Append(L_IMPORT_CIRC, U("Logisim 2.7 电路 (.circ)…"));
+        m->Append(L_LOAD_COMPONENT, U("自定义元件 (.component.json)…"));
+        m->Append(L_IMPORT_TABLE, U("真值表 CSV…"));
+        return m;
+    };
+    auto exportMenu = [] {
+        auto m = new wxMenu();
+        m->Append(L_PNG, U("完整电路 PNG…"));
+        m->Append(L_BATCH_PNG, U("批量子电路 PNG…"));
+        m->AppendSeparator();
+        m->Append(L_CSV, U("最近分析 CSV…"));
+        m->Append(L_NETLIST_JSON, U("逻辑网表 JSON…"));
+        m->Append(L_PCB, U("KiCad PCB…"));
+        m->Append(L_SAVE_COMPONENT, U("当前电路为自定义元件…"));
+        return m;
+    };
+    auto file = new wxMenu();
+    file->Append(wxID_NEW, U("新建数字工程\tCtrl+N"));
+    file->Append(L_TEMPLATE, U("从模板新建…"));
+    file->Append(L_DEMO, U("打开半加器示例"));
+    file->AppendSeparator();
+    file->Append(wxID_OPEN, U("打开…\tCtrl+O"));
+    file->Append(L_RECENT, U("最近打开"));
+    file->AppendSeparator();
+    file->Append(wxID_SAVE, U("保存\tCtrl+S"));
+    file->Append(L_SAVE_AS, U("另存为…\tCtrl+Shift+S"));
+    file->AppendSeparator();
+    file->Append(L_IMPORT_MENU, U("导入"), importMenu());
+    file->Append(L_EXPORT_MENU, U("导出"), exportMenu());
+    file->AppendSeparator();
+    file->Append(wxID_EXIT, U("关闭"));
+    bar->Append(file, U("文件"));
     menu("编辑", {{wxID_UNDO, "撤销\tCtrl+Z"},
                   {wxID_REDO, "重做\tCtrl+Y"},
                   {wxID_COPY, "复制\tCtrl+C"},
@@ -183,8 +201,6 @@ LogicEditor::LogicEditor(wxWindow *parent)
                   {L_FIT, "适合画面 (Home)"}, {L_DIAGNOSTICS,"查看 ERC 问题…\tCtrl+Shift+E"}});
     menu("项目", {{L_NEW_CIRCUIT, "新建子电路…\tCtrl+Shift+N"},
                   {L_NEW_COMPONENT, "新建自定义元件…"},
-                  {L_SAVE_COMPONENT, "保存当前电路为元件…"},
-                  {L_LOAD_COMPONENT, "导入自定义元件…"},
                   {L_WRAP, "封装当前电路为子电路…"},
                   {L_RENAME, "重命名当前电路…"},
                   {L_DEL_CIRCUIT, "删除当前子电路\tCtrl+Shift+Delete"}});
@@ -203,7 +219,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
     bar->GetMenu(4)->Append(L_MONITOR, U("信号监测 / 连续 CSV 日志…"));
     bar->GetMenu(4)->Append(L_TEXT_DEVICE, U("键盘输入 / TTY 内容…"));
     menu("分析", {{L_TABLE, "当前电路真值表与表达式"}, {L_EXPRESSION, "表达式 → 真值表…"},
-                  {L_NEW_TABLE,"新建可编辑真值表…"}, {L_IMPORT_TABLE,"导入真值表 CSV…"}});
+                  {L_NEW_TABLE,"新建可编辑真值表…"}});
     menu("帮助", {{L_GUIDE, "操作指南"}, {L_HELP, "数字逻辑使用说明"}});
     SetMenuBar(bar);
     auto root = new wxBoxSizer(wxVERTICAL);
@@ -222,6 +238,18 @@ LogicEditor::LogicEditor(wxWindow *parent)
             },
             id);
     };
+    button(wxID_NEW, "新建", "New");
+    button(wxID_OPEN, "打开", "Open");
+    button(wxID_SAVE, "保存", "Save");
+    shortcuts->AddSeparator();
+    auto dropdown = [shortcuts](int id, const char *name, const char *asset, wxMenu *m) {
+        shortcuts->AddTool(id, U(name), icon(asset), U(name), wxITEM_DROPDOWN);
+        shortcuts->SetDropdownMenu(id, m);
+        shortcuts->Bind(wxEVT_TOOL, [shortcuts, m](wxCommandEvent &) { shortcuts->PopupMenu(m); }, id);
+    };
+    dropdown(L_IMPORT_MENU, "导入", "Import", importMenu());
+    dropdown(L_EXPORT_MENU, "导出", "Export", exportMenu());
+    shortcuts->AddSeparator();
     button(L_SELECT, "选择 S", "Select");
     button(L_WIRE, "导线 W", "Wire");
     shortcuts->AddSeparator();
@@ -629,6 +657,11 @@ LogicEditor::LogicEditor(wxWindow *parent)
         wxFileDialog file(this,U("导入真值表 CSV"),"","","CSV (*.csv)|*.csv",wxFD_OPEN|wxFD_FILE_MUST_EXIST);
         if(file.ShowModal()==wxID_OK) { stop();showTable(parseTruthCsv(readFile(fsPath(file.GetPath())))); }
     });
+    bind(L_IMPORT_CIRC, [this] {
+        wxFileDialog file(this, U("导入 Logisim 2.7 电路"), "", "", "Logisim (*.circ)|*.circ",
+                          wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+        if (file.ShowModal() == wxID_OK && discard()) load(file.GetPath());
+    });
     bind(L_NEW_TABLE,[this] {
         wxTextEntryDialog inputs(this,U("输入变量名，以英文逗号分隔（1–10 个）"),U("新建真值表"),"A,B");
         if(inputs.ShowModal()!=wxID_OK)return;
@@ -691,14 +724,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
     bind(L_PIN_LAYOUT, [this] { pinLayout(); });
     bind(L_MONITOR, [this] { monitorSignals(); });
     bind(L_BATCH_PNG, [this] { exportBatch(); });
-    bind(L_PREVIEW, [this] { printCircuit(true); });
-    bind(L_PRINT, [this] { printCircuit(false); });
     bind(L_TEXT_DEVICE, [this] { textDevice(); });
-    bind(L_EXPORT_CIRC, [this] {
-        wxFileDialog dialog(this,U("导出 Logisim 2.7 电路"),"","project.circ","Logisim (*.circ)|*.circ",
-                            wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-        if(dialog.ShowModal()==wxID_OK) writeAtomic(fsPath(dialog.GetPath()),exportCirc(history.project));
-    });
     bind(L_ROTATE, [this] {
         change([this] { for(const auto &id : canvas->selected)
             if(auto p=circuit().part(id)) p->rotation=(p->rotation+1)%4; });
@@ -731,7 +757,8 @@ LogicEditor::LogicEditor(wxWindow *parent)
     bind(L_NEW_COMPONENT, [this] { newComponent(); });
     bind(L_SAVE_COMPONENT, [this] { saveComponent(); });
     bind(L_LOAD_COMPONENT, [this] { loadComponent(); });
-    bind(L_NETLIST, [this] { exportNetlist(); });
+    bind(L_NETLIST_JSON, [this] { exportLogicNetlist(); });
+    bind(L_PCB, [this] { exportKiCadPcb(); });
     bind(L_WRAP, [this] { encapsulate(); });
     bind(L_RENAME, [this] { renameCircuit(); });
     bind(L_DEL_CIRCUIT, [this] { deleteCircuit(); });
@@ -747,11 +774,12 @@ LogicEditor::LogicEditor(wxWindow *parent)
             "   封装功能将当前电路的副本保存为子电路定义；每个实例的寄存器、RAM 状态独立。\n"
             "6. Ctrl+S 保存整个工程（包括全部子电路）；Ctrl+Z/Y 撤销重做；Ctrl+C/V 使用系统剪贴板。\n"
             "7. 分析菜单生成组合电路真值表和标准与或表达式，可导出 CSV；输入最多 10 位。\n"
-            "8. 文件菜单导出完整电路 PNG，不限于屏幕区域。\n"
-            "9. 项目 → 新建自定义元件：设置接口后在画布实现逻辑，可保存为 .component.json 并跨工程导入。\n"
-            "10. 文件 → 导出网表：导出当前电路及嵌套元件，支持 KiCad .net 和完整数字 .net.json。\n"
-            "9. 诊断列表双击定位；事件追踪显示传播时刻与实例路径。复位后可用 F7 从初始队列单步调试。\n"
-            "10. 文件 → 打开支持 外部电路 2.7 .circ 受限导入；请查看诊断，保存仍使用 .logic.json。\n"
+            "8. 文件 → 导出集中提供完整/批量 PNG、分析 CSV、网表和自定义元件；PNG 不限于屏幕区域。\n"
+            "9. 项目 → 新建自定义元件：设置接口后在画布实现逻辑，通过文件 → 导出保存 .component.json。\n"
+            "10. 文件 → 导出 → 逻辑网表 JSON：保存当前电路及嵌套实例的连接、位宽和器件参数。\n"
+            "    文件 → 导出 → KiCad PCB：生成 .kicad_pcb、配套 .net 和 .mapping.json，在 KiCad PCB 编辑器打开板文件。\n"
+            "11. 点击画布 ERC 图标或按 Ctrl+Shift+E 查看问题，单击列表项定位；事件追踪显示传播时刻与实例路径。\n"
+            "12. 文件 → 导入集中提供 .circ、自定义元件和真值表 CSV；导入 .circ 后保存为 .logic.json。\n"
              "位宽 1–32；多输入逻辑门、可配置选择器、位分组总线、零/符号扩展；RAM/ROM 容量由地址位数设置。\n"
              "时序元件可配置触发沿；CLR 引脚为异步清零（高电平有效，与时钟无关）；"
             "计数器 CARRY 在计到位宽最大值时输出 1，可用它级联多级计数器。复位操作恢复属性中的初值。\n"
@@ -852,7 +880,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
         e.Skip();
     });
     rebuild(true, true);
-    wxConfig config("PracticeEDA");
+    auto &config = *wxConfigBase::Get();
     for(int i=0;i<8;++i) { wxString path; if(config.Read("recent/"+std::to_string(i),&path) && !path.empty())
         recentFiles.push_back(utf8(path)); }
     Centre();
@@ -1654,26 +1682,52 @@ void LogicEditor::loadComponent() {
     rebuild(false);
 }
 
-void LogicEditor::exportNetlist() {
+void LogicEditor::exportLogicNetlist() {
     canvas->cancel();
-    wxFileDialog dialog(this, U("导出当前电路网表（包含嵌套元件）"), "", "circuit.net",
-                        U("逻辑连接网表 (*.net)|*.net|完整数字网表 (*.net.json)|*.net.json|KiCad实体映射网表 (*.physical.net)|*.physical.net"),
-                        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-    dialog.SetName("export-netlist-dialog");
-    if (dialog.ShowModal() != wxID_OK)
-        return;
-    if(dialog.GetFilterIndex()==2) {
-        auto result=exportPcb(history.project,current);auto file=fsPath(dialog.GetPath());
-        auto board=file;board.replace_extension(".kicad_pcb");auto mapping=file;mapping.replace_extension(".mapping.json");
-        writeAtomic(file,result.netlist);writeAtomic(board,result.board);writeAtomic(mapping,result.manifest);
-        showReport("实体映射已导出","已生成标准.net网表、对应.kicad_pcb和引脚映射JSON。\n"
-                   "范围：单比特二输入AND/OR/NAND/XOR及NOT，包含嵌套展开、电源、去耦和连接器。\n"
-                   "每个门使用独立DIP芯片；未布线，需在PCB软件中继续布局、布线和规则验证。\n"+board.u8string());
-        return;
-    }
     // 单独编译已提交的工程：实时输入变化、RAM 与时钟状态保持不变。
     Simulator compiled(history.project, current);
-    writeAtomic(fsPath(dialog.GetPath()), compiled.netlist(dialog.GetFilterIndex() == 0));
+    const auto content = compiled.netlist();
+    wxFileDialog dialog(this, U("导出逻辑网表 JSON（包含嵌套元件）"), "", "circuit.json",
+                        U("逻辑网表 JSON (*.json)|*.json"),
+                        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    dialog.SetName("export-logic-netlist-dialog");
+    if (dialog.ShowModal() != wxID_OK)
+        return;
+    if (!dialog.GetPath().Lower().EndsWith(".json"))
+        throw std::runtime_error("逻辑网表请使用 .json 后缀保存");
+    writeAtomic(fsPath(dialog.GetPath()), content);
+}
+
+void LogicEditor::exportKiCadPcb() {
+    canvas->cancel();
+    // 先检查实体映射；不支持的器件在选择保存位置前提示，不生成半成品。
+    const auto result = exportPcb(history.project, current);
+    wxFileDialog dialog(this, U("导出 KiCad PCB（包含配套网表和引脚映射）"), "", "circuit.kicad_pcb",
+                        U("KiCad PCB (*.kicad_pcb)|*.kicad_pcb"), wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    dialog.SetName("export-kicad-pcb-dialog");
+    if (dialog.ShowModal() != wxID_OK)
+        return;
+    if (!dialog.GetPath().Lower().EndsWith(".kicad_pcb"))
+        throw std::runtime_error("KiCad PCB 请使用 .kicad_pcb 后缀保存");
+    const auto board = fsPath(dialog.GetPath());
+    auto netlist = board; netlist.replace_extension(".net");
+    auto mapping = board; mapping.replace_extension(".mapping.json");
+    std::string existing;
+    for (const auto &path : {netlist, mapping})
+        if (std::filesystem::exists(path)) existing += path.u8string() + "\n";
+    if (!existing.empty() &&
+        wxMessageBox(U("以下配套文件已存在，将同时覆盖：\n" + existing + "\n是否继续？"),
+                     U("覆盖配套文件"), wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this) != wxYES) {
+        return;
+    }
+    writeAtomic(netlist, result.netlist);
+    writeAtomic(mapping, result.manifest);
+    writeAtomic(board, result.board);
+    showReport("KiCad PCB 已导出",
+               "请在 KiCad PCB 编辑器中打开：\n" + board.u8string() +
+               "\n\n配套网表：\n" + netlist.u8string() + "\n引脚映射：\n" + mapping.u8string() +
+               "\n\n支持单比特二输入 AND/OR/NAND/XOR 及 NOT，包含电源、去耦和连接器。\n"
+               "板文件未布线，请继续布局、布线和设计规则检查。");
 }
 
 void LogicEditor::newCircuit() {
@@ -2851,11 +2905,50 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     auto shortcuts = dynamic_cast<wxToolBar *>(wxWindow::FindWindowByName("logic-components", this));
     const std::vector<std::string> toolbarKinds = {
         "Select", "Wire", "Input", "Output", "Not", "Buffer", "And", "Or", "Xor", "Nand", "Nor", "Xnor"};
-    if (!shortcuts || shortcuts->GetToolsCount() != toolbarKinds.size() + 2 ||
+    if (!shortcuts || shortcuts->GetToolsCount() != toolbarKinds.size() + 9 ||
         wxWindow::FindWindowByName("logic-actions", this))
         throw std::runtime_error("digital component toolbar missing");
+    const std::vector<int> fileTools = {wxID_NEW, wxID_OPEN, wxID_SAVE, wxID_SEPARATOR,
+                                       L_IMPORT_MENU, L_EXPORT_MENU, wxID_SEPARATOR};
+    for (size_t i = 0; i < fileTools.size(); ++i) {
+        auto tool = shortcuts->GetToolByPos(int(i));
+        if (tool->GetId() != fileTools[i])
+            throw std::runtime_error("file tools are not grouped before editing tools");
+    }
+    for (int group : {L_IMPORT_MENU, L_EXPORT_MENU}) {
+        auto item = GetMenuBar()->FindItem(group);
+        auto tool = shortcuts->FindById(group);
+        if (!item || !item->GetSubMenu() || !tool || tool->GetKind() != wxITEM_DROPDOWN ||
+            !tool->GetDropdownMenu())
+            throw std::runtime_error("file import/export menu or dropdown missing");
+        const std::vector<int> expected = group == L_IMPORT_MENU
+            ? std::vector<int>{L_IMPORT_CIRC, L_LOAD_COMPONENT, L_IMPORT_TABLE}
+            : std::vector<int>{L_PNG, L_BATCH_PNG, L_CSV, L_NETLIST_JSON, L_PCB, L_SAVE_COMPONENT};
+        for (auto m : {item->GetSubMenu(), tool->GetDropdownMenu()}) {
+            std::vector<int> actual;
+            for (auto entry : m->GetMenuItems())
+                if (!entry->IsSeparator()) actual.push_back(entry->GetId());
+            if (actual != expected)
+                throw std::runtime_error("file menu and toolbar exchange commands differ");
+        }
+        for (int id : expected) {
+            wxMenu *parent = nullptr;
+            if (!GetMenuBar()->FindItem(id, &parent) || parent != item->GetSubMenu())
+                throw std::runtime_error("exchange command remains outside its file group");
+        }
+    }
+    std::function<void(wxMenu *)> checkRemovedMenus = [&](wxMenu *m) {
+        for (auto item : m->GetMenuItems()) {
+            if (item->GetItemLabelText().Contains(U("打印")) ||
+                item->GetItemLabelText().Contains(U("导出 Logisim")))
+                throw std::runtime_error("removed print or Logisim export command remains");
+            if (item->GetSubMenu()) checkRemovedMenus(item->GetSubMenu());
+        }
+    };
+    for (size_t i = 0; i < GetMenuBar()->GetMenuCount(); ++i)
+        checkRemovedMenus(GetMenuBar()->GetMenu(i));
     size_t shortcutIndex = 0;
-    for (size_t i = 0; i < shortcuts->GetToolsCount(); ++i) {
+    for (size_t i = fileTools.size(); i < shortcuts->GetToolsCount(); ++i) {
         auto tool = shortcuts->GetToolByPos(int(i));
         if (tool->IsSeparator())
             continue;
@@ -2875,7 +2968,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     std::vector<std::string> iconKinds;
     for (auto &part : library())
         iconKinds.push_back(part.kind);
-    for (auto name : {"New", "Open", "Save", "Copy", "Cut", "Paste", "Undo", "Redo", "Help", "Folder",
+    for (auto name : {"New", "Open", "Save", "Import", "Export", "Copy", "Cut", "Paste", "Undo", "Redo", "Help", "Folder",
                       "Select", "Wire", "Node", "Step", "Run", "Reset", "Table", "Subcircuit"})
         iconKinds.push_back(name);
     wxBitmap atlas(960, int((iconKinds.size() + 5) / 6) * 90, 32);
@@ -3385,7 +3478,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
         canvas->exportPng(wxString((folder / ("logic-" + name + ".png")).wstring()));
     }
     // 验证真实的自定义元件对话框，以及用户会走的历史/库/画布路径。
-    for (int id : {L_NEW_COMPONENT, L_SAVE_COMPONENT, L_LOAD_COMPONENT, L_NETLIST})
+    for (int id : {L_NEW_COMPONENT, L_SAVE_COMPONENT, L_LOAD_COMPONENT, L_NETLIST_JSON, L_PCB})
         if (!GetMenuBar()->FindItem(id))
             throw std::runtime_error("feature menu item missing");
     history.reset(Project{});
@@ -3448,8 +3541,11 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
         throw std::runtime_error("placed custom component simulation failed");
     auto timeBeforeExport = simulator->time();
     auto queueBeforeExport = simulator->pending();
-    writeAtomic(folder / "custom-half-adder.net", simulator->netlist(true));
-    writeAtomic(folder / "custom-half-adder.net.json", simulator->netlist());
+    writeAtomic(folder / "custom-half-adder.json", simulator->netlist());
+    const auto pcb = exportPcb(history.project, current);
+    writeAtomic(folder / "custom-half-adder.net", pcb.netlist);
+    writeAtomic(folder / "custom-half-adder.kicad_pcb", pcb.board);
+    writeAtomic(folder / "custom-half-adder.mapping.json", pcb.manifest);
     if (simulator->time() != timeBeforeExport || simulator->pending() != queueBeforeExport)
         throw std::runtime_error("netlist export modified GUI simulation");
     canvas->fit();
@@ -3940,6 +4036,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
     writeAtomic(
         folder / "LOGIC-PASS.txt",
         "Digital-only GUI: default startup, complete icon catalog at 1x/2x, tree mappings, "
+        "grouped file menus and toolbar dropdowns, no print/Logisim export commands, "
         "component toolbar bindings, single placement returns to Select, blank click does not duplicate, "
         "selection-mode pin wiring/bends/cancel/undo/redo, zoomed-out center selection, "
         "all canvas symbols/previews/state colours, stable terminal hit targets, "
@@ -3948,9 +4045,11 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
         "copy/paste/undo/redo, property input, save/load with Unicode path, simulation, truth table "
         "and full PNG export passed.\n"
         "Custom component dialog/interfaces, undo/redo, library import/placement, nested simulation, "
-        "Unicode component file, KiCad/JSON netlists and export state preservation passed.\n"
+        "Unicode component file, separate JSON/KiCad PCB export menus, JSON logical netlist, "
+        "physical netlist/board/mapping bundle and export state preservation passed.\n"
         "外部电路 import, persistent diagnostics/navigation, unsaved state and native save/source "
         "preservation passed.\n");
+    runModuleSmoke(folder);
 }
 void LogicEditor::closeSmoke() {
     canvas->cancel();
