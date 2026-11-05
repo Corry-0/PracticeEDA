@@ -1,0 +1,24 @@
+{
+  "format": "PracticeEDA.logic", "version": 1,
+  "name": "实验案例：16×8 RAM 读写", "main": "main", "nextId": 100,
+  "circuits": [{
+    "name": "main", "nodes": [],
+    "parts": [
+      {"id":"addr","kind":"Input","label":"ADDR","circuit":"","at":[120,100],"width":4,"value":0,"data":[]},
+      {"id":"data","kind":"Input","label":"DATA","circuit":"","at":[120,250],"width":8,"value":42,"data":[]},
+      {"id":"we","kind":"Input","label":"WE","circuit":"","at":[120,400],"width":1,"value":0,"data":[]},
+      {"id":"clk","kind":"Clock","label":"CLK","circuit":"","at":[120,550],"width":1,"value":0,"data":[]},
+      {"id":"ram","kind":"RAM","label":"RAM 16 x 8","circuit":"","at":[480,300],"width":8,"value":0,"data":[],"params":{"addressBits":4}},
+      {"id":"q","kind":"Output","label":"Q","circuit":"","at":[820,220],"width":8,"value":0,"data":[]},
+      {"id":"hex","kind":"Hex","label":"Hex Q","circuit":"","at":[820,420],"width":8,"value":0,"data":[]}
+    ],
+    "wires": [
+      {"id":"w1","a":["addr","Y"],"b":["ram","ADDR"],"bends":[[280,100],[280,270]]},
+      {"id":"w2","a":["data","Y"],"b":["ram","D"],"bends":[[320,250],[320,290]]},
+      {"id":"w3","a":["we","Y"],"b":["ram","WE"],"bends":[[350,400],[350,310]]},
+      {"id":"w4","a":["clk","Y"],"b":["ram","CLK"],"bends":[[380,550],[380,330]]},
+      {"id":"w5","a":["ram","Q"],"b":["q","A"],"bends":[[640,300],[640,220]]},
+      {"id":"w6","a":["ram","Q"],"b":["hex","A"],"bends":[[680,300],[680,420]]}
+    ]
+  }]
+}

@@ -59,7 +59,7 @@ enum {
     L_CIRCLE,
     L_GUIDE, L_UP, L_EDIT_DEFINITION, L_MEMORY_INITIAL, L_MEMORY_RUNTIME, L_PIN_LAYOUT,
     L_MONITOR, L_RECENT, L_TEMPLATE, L_BATCH_PNG, L_IMPORT_CIRC, L_IMPORT_MENU, L_EXPORT_MENU,
-    L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE, L_DIAGNOSTICS, L_REROUTE,
+    L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE, L_DIAGNOSTICS, L_REROUTE, L_EXPERIMENTS,
     L_RECENT_FIRST = wxID_HIGHEST + 900
 };
 enum PropertyRow { P_CIRCUIT, P_ROTATION, P_WIDTH, P_INPUTS, P_SELECT, P_INPUTWIDTH, P_OUTPUTWIDTH,
@@ -221,6 +221,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
     menu("分析", {{L_TABLE, "当前电路真值表与表达式"}, {L_EXPRESSION, "表达式 → 真值表…"},
                   {L_NEW_TABLE,"新建可编辑真值表…"}});
     menu("帮助", {{L_GUIDE, "操作指南"}, {L_HELP, "数字逻辑使用说明"}});
+    menu("案例", {{L_EXPERIMENTS, "实验案例…"}});
     SetMenuBar(bar);
     auto root = new wxBoxSizer(wxVERTICAL);
     auto shortcuts = new wxToolBar(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
@@ -730,6 +731,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
             if(auto p=circuit().part(id)) p->rotation=(p->rotation+1)%4; });
     });
     bind(L_RECENT, [this] { recentMenu(); });
+    bind(L_EXPERIMENTS, [this] { showExperimentCases(); });
     bind(L_TEMPLATE, [this] {
         wxArrayString choices; choices.Add(U("空白数字工程")); choices.Add(U("半加器（组合逻辑）"));
         choices.Add(U("答辩演示：两层实例 / 独立寄存器与 RAM"));
@@ -2878,11 +2880,16 @@ void LogicCanvas::exportPng(const wxString &path, double requestedScale) {
         throw;
     }
 }
-void LogicEditor::runSmoke(const std::filesystem::path &folder) {
+void LogicEditor::runSmoke(const std::filesystem::path &folder, bool experimentsOnly) {
     std::filesystem::create_directories(folder);
     std::error_code ignored;
     std::filesystem::remove(folder / "LOGIC-PASS.txt", ignored);
     std::filesystem::remove(folder / "FAILED.txt", ignored);
+    std::filesystem::remove(folder / "EXPERIMENTS-PASS.txt", ignored);
+    if (experimentsOnly) {
+        runExperimentSmoke(folder);
+        return;
+    }
     if (!tree->GetImageList() || iconIds.size() != library().size() + 5)
         throw std::runtime_error("component tree icon catalog is incomplete");
     size_t componentCount = 0;
@@ -4049,6 +4056,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder) {
         "physical netlist/board/mapping bundle and export state preservation passed.\n"
         "外部电路 import, persistent diagnostics/navigation, unsaved state and native save/source "
         "preservation passed.\n");
+    runExperimentSmoke(folder);
     runModuleSmoke(folder);
 }
 void LogicEditor::closeSmoke() {
