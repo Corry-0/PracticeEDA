@@ -1,0 +1,8 @@
+#pragma once
+#include <string_view>
+
+namespace eda::logic::stock {
+inline constexpr std::string_view dip = R"kicad(@EDA_DIP_FOOTPRINT@)kicad";
+inline constexpr std::string_view capacitor = R"kicad(@EDA_CAP_FOOTPRINT@)kicad";
+inline constexpr std::string_view header = R"kicad(@EDA_HEADER_FOOTPRINT@)kicad";
+}

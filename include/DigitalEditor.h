@@ -81,6 +81,7 @@ class LogicEditor : public wxFrame {
     void saveComponent();
     void loadComponent();
     void exportLogicNetlist();
+    void exportPhysicalNetlist();
     void exportKiCadPcb();
     void encapsulate();
     void renameCircuit();

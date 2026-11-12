@@ -284,10 +284,19 @@ void LogicEditor::runModuleSmoke(const std::filesystem::path &folder) {
         // 对象 ID 为全工程唯一，使用组件导入为每个额外定义重分配 ID。
         auto p=halfAdder();auto first=importComponent(p,exportComponent(halfAdder(),"main"));p.circuit(first).name="a/b";
         auto second=importComponent(p,exportComponent(halfAdder(),"main"));p.circuit(second).name="a:b";
+        for(const auto &name:std::vector<std::string>{"A_B","a_b_2","CON","con.txt","LPT1","COM1","...","tail. ","tail","Case","case"}) {
+            auto imported=importComponent(p,exportComponent(halfAdder(),"main"));p.circuit(imported).name=name;
+        }
         activate(p);const auto destination=outputs/"batch-name-collision";std::filesystem::create_directories(destination);
+        writeAtomic(destination/"A_B.png","existing image sentinel");
         DialogResponses hook([&](wxDialog *dialog){if(auto directory=dynamic_cast<wxDirDialog *>(dialog)){directory->SetPath(wxString(destination.wstring()));return wxID_OK;}if(auto scale=dynamic_cast<wxTextEntryDialog *>(dialog)){scale->SetValue("0.25");return wxID_OK;}return wxID_CANCEL;});
         exportBatch();size_t count=0;for(const auto &entry:std::filesystem::directory_iterator(destination))if(entry.path().extension()==".png")++count;
-        require(count==p.circuits.size(),"distinct circuit names overwrite the same sanitized PNG filename");
+        require(count==p.circuits.size()+1,"distinct circuit names overwrite the same sanitized PNG filename");
+        require(readFile(destination/"A_B.png")=="existing image sentinel","batch export overwrote an existing file");
+        for(const auto &entry:std::filesystem::directory_iterator(destination)) {
+            if(entry.path().filename()=="A_B.png")continue;
+            wxImage image(wxString(entry.path().wstring()));require(image.IsOk(),"batch output is not a readable PNG");
+        }
     });
     scenario("M22","Nonempty half-adder template is an unsaved design",[&] {
         DialogResponses hook([&](wxDialog *dialog){if(auto choice=dynamic_cast<wxSingleChoiceDialog *>(dialog)){choice->SetSelection(1);return wxID_OK;}return wxID_NO;});
@@ -330,9 +339,44 @@ void LogicEditor::runModuleSmoke(const std::filesystem::path &folder) {
         cancel=false;invoke("新建数字工程");require(readFile(path)==bytes&&circuit().parts.empty()&&savedPath.empty(),"save-before-new lost edited design");
     });
     scenario("M26","Malformed HEX repeat count is rejected",[&] {
-        activate(memoryProject());canvas->selected={circuit().parts.front().id};const auto input=outputs/"invalid-repeat.hex";writeAtomic(input,"v2.0 raw\n2x*2a\n");int errors=0;
-        DialogResponses hook([&](wxDialog *dialog){if(dynamic_cast<wxFileDialog *>(dialog))return fileResponse(dialog,input);if(wxWindow::FindWindowByName("initial-memory-grid",dialog)){press(buttonNamed(dialog,U("载入 HEX…")));return wxID_CANCEL;}++errors;return wxID_OK;});
-        memoryEditor(false);require(errors==1,"invalid repeat count 2x was silently parsed as 2");
+        activate(memoryProject());canvas->selected={circuit().parts.front().id};const auto input=outputs/"invalid-repeat.hex";
+        for(const auto &token:std::vector<std::string>{"2x*2a","-2*2a","+2*2a","*2a","0*2a","999999999999999999999999999999*2a","17*2a","2**2a","2*"}) {
+            writeAtomic(input,"v2.0 raw\n7f "+token+"\n");int errors=0;
+            const auto before=serialize(history.project);
+            DialogResponses hook([&](wxDialog *dialog){
+                if(dynamic_cast<wxFileDialog *>(dialog))return fileResponse(dialog,input);
+                if(auto grid=dynamic_cast<wxGrid *>(wxWindow::FindWindowByName("initial-memory-grid",dialog))) {
+                    const auto cell=grid->GetCellValue(0,0);
+                    press(buttonNamed(dialog,U("载入 HEX…")));
+                    require(grid->GetCellValue(0,0)==cell,"failed HEX load partially modified initial memory");return wxID_CANCEL;
+                }
+                ++errors;return wxID_OK;
+            });
+            memoryEditor(false);require(errors==1,"malformed HEX repeat count accepted: "+token);
+            require(serialize(history.project)==before,"failed HEX import changed project");
+        }
+    });
+    scenario("M27","KiCad and OrCAD standalone netlists through one menu",[&] {
+        activate(halfAdder());
+        const auto bytes=serialize(history.project);auto runtime=simulator.get();auto time=simulator->time();auto pending=simulator->pending();
+        for(int selection:{0,1}) {
+            const auto target=outputs/(selection==0?"standalone-kicad.net":"standalone-orcad.net");
+            int choices=0,files=0;
+            DialogResponses hook([&](wxDialog *dialog){
+                if(auto format=dynamic_cast<wxSingleChoiceDialog *>(dialog)) {
+                    ++choices;format->SetSelection(selection);return wxID_OK;
+                }
+                auto file=dynamic_cast<wxFileDialog *>(dialog);
+                require(choices==1&&file,"expected save dialog after choosing netlist format");
+                require(file->GetFilename()==(selection==0?"circuit-kicad.net":"circuit-orcad.net"),"default netlist filename differs");
+                ++files;return fileResponse(dialog,target);
+            });
+            invoke("PCB 网表…");
+            require(choices==1&&files==1,"standalone netlist dialogs differ");
+            require(readFile(target).rfind(selection==0?"(export ":"( { OrCAD/PCB II Netlist Format",0)==0,
+                    "wrong format was written");
+            noChange(bytes,runtime,time,pending);
+        }
     });
     activate(halfAdder());
     writeAtomic(folder/"MODULE-SUMMARY.txt","cases="+std::to_string(cases)+"\nassertions="+std::to_string(assertions)+"\nfailures="+std::to_string(failures)+"\n");

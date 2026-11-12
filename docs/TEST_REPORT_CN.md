@@ -1,6 +1,8 @@
 # PracticeEDA 0.5 功能与回归测试报告
 
-2026-10-29 上传前复核：Debug/x64、Release/x64 均编译通过，各自 10/10 CTest 通过。新增 `tests/editor_module_tests.cpp` 的 26 项模块场景在两个配置下均为 23 项通过、3 项失败：M21 的不同电路名经文件名清理后可能覆盖同一 PNG；M22 的非空半加器模板未标记为未保存；M26 的 HEX 重复次数 `2x*2a` 未被拒绝。GUI 冒烟测试因此返回非零退出码，这三项仍待修复。可用 `python -X utf8 scripts/run_module_audit.py --build-dir build --report-dir build/module-audit --stage current` 复现；每次运行使用新的 `--stage` 名称。
+2026-11-12 Release/x64 回归：编译成功，CTest 11/11 通过，GUI 模块验收 27/27 通过（202 项断言）。批量 PNG 文件名冲突、非空模板保存状态和 HEX 非法重复次数均已回归通过。KiCad 与 OrCAD PCB II 网表共用实体引脚映射；OrCAD 封装字段只写封装名。KiCad 10.0.7 读取半加器和多门共片板文件后，分别有 36 和 86 个已分配焊盘与配套网表一致，封装几何与原库一致。板文件未布线。以下为历史记录。
+
+2026-10-29 上传前复核：Debug/x64、Release/x64 均编译通过，各自 10/10 CTest 通过。新增 `tests/editor_module_tests.cpp` 的 26 项模块场景在两个配置下均为 23 项通过、3 项失败：M21 的不同电路名经文件名清理后可能覆盖同一 PNG；M22 的非空半加器模板未标记为未保存；M26 的 HEX 重复次数 `2x*2a` 未被拒绝。GUI 冒烟测试因此返回非零退出码。模块验收可用 `python -X utf8 scripts/run_module_audit.py --build-dir build --report-dir build/module-audit --stage current` 执行；每次运行使用新的 `--stage` 名称。
 
 2026-10-29 更新：移除 Logisim `.circ` 导出、打印和打印预览，导入/导出统一进入文件菜单及顶部相邻下拉按钮。Release 构建通过；当前 10/10 CTest 通过，GUI 的 LOGIC、SHAPES、EDITOR-UI、HIERARCHY-UI、SYMBOLS、LAYOUT-ERC、ROUTING 七组标志均通过。GUI 检查包含菜单/工具栏分组一致性、已删入口消失、原生保存、`.circ` 导入及源文件保护、自定义元件、PNG、网表、仿真和布线。Logisim 导出专用的 `circ_exchange_tests` 与 `logisim_exchange_validation` 已移除；以下 2026-10-08 结果为历史记录。
 

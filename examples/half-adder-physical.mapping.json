@@ -115,6 +115,18 @@
       ],
       "path": "p3",
       "ref": "U1",
+      "symbol": "74xx:74HC86",
+      "units": [
+        {
+          "path": "p3",
+          "pins": {
+            "A": 1,
+            "B": 2,
+            "Y": 3
+          },
+          "unit": "A"
+        }
+      ],
       "value": "74HC86"
     },
     {
@@ -196,6 +208,18 @@
       ],
       "path": "p4",
       "ref": "U2",
+      "symbol": "74xx:74LS08",
+      "units": [
+        {
+          "path": "p4",
+          "pins": {
+            "A": 1,
+            "B": 2,
+            "Y": 3
+          },
+          "unit": "A"
+        }
+      ],
       "value": "74HC08"
     },
     {

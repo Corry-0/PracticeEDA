@@ -60,6 +60,7 @@ enum {
     L_GUIDE, L_UP, L_EDIT_DEFINITION, L_MEMORY_INITIAL, L_MEMORY_RUNTIME, L_PIN_LAYOUT,
     L_MONITOR, L_RECENT, L_TEMPLATE, L_BATCH_PNG, L_IMPORT_CIRC, L_IMPORT_MENU, L_EXPORT_MENU,
     L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE, L_DIAGNOSTICS, L_REROUTE, L_EXPERIMENTS,
+    L_NETLIST_PCB,
     L_RECENT_FIRST = wxID_HIGHEST + 900
 };
 enum PropertyRow { P_CIRCUIT, P_ROTATION, P_WIDTH, P_INPUTS, P_SELECT, P_INPUTWIDTH, P_OUTPUTWIDTH,
@@ -158,6 +159,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
         m->AppendSeparator();
         m->Append(L_CSV, U("最近分析 CSV…"));
         m->Append(L_NETLIST_JSON, U("逻辑网表 JSON…"));
+        m->Append(L_NETLIST_PCB, U("PCB 网表…"));
         m->Append(L_PCB, U("KiCad PCB…"));
         m->Append(L_SAVE_COMPONENT, U("当前电路为自定义元件…"));
         return m;
@@ -744,7 +746,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
             if(!std::filesystem::exists(path))
                 path=std::filesystem::path(__FILE__).parent_path().parent_path()/"examples"/"defense-hierarchy.logic.json";
             history.reset(deserialize(readFile(path)),false);
-        } else history.reset(dialog.GetSelection()==1 ? halfAdder() : Project{});
+        } else history.reset(dialog.GetSelection()==1 ? halfAdder() : Project{}, dialog.GetSelection()!=1);
         current=history.project.main; savedPath.clear(); scope.clear(); navigation.clear();
         rebuild(true,true); canvas->fit();
     });
@@ -760,6 +762,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
     bind(L_SAVE_COMPONENT, [this] { saveComponent(); });
     bind(L_LOAD_COMPONENT, [this] { loadComponent(); });
     bind(L_NETLIST_JSON, [this] { exportLogicNetlist(); });
+    bind(L_NETLIST_PCB, [this] { exportPhysicalNetlist(); });
     bind(L_PCB, [this] { exportKiCadPcb(); });
     bind(L_WRAP, [this] { encapsulate(); });
     bind(L_RENAME, [this] { renameCircuit(); });
@@ -779,7 +782,8 @@ LogicEditor::LogicEditor(wxWindow *parent)
             "8. 文件 → 导出集中提供完整/批量 PNG、分析 CSV、网表和自定义元件；PNG 不限于屏幕区域。\n"
             "9. 项目 → 新建自定义元件：设置接口后在画布实现逻辑，通过文件 → 导出保存 .component.json。\n"
             "10. 文件 → 导出 → 逻辑网表 JSON：保存当前电路及嵌套实例的连接、位宽和器件参数。\n"
-            "    文件 → 导出 → KiCad PCB：生成 .kicad_pcb、配套 .net 和 .mapping.json，在 KiCad PCB 编辑器打开板文件。\n"
+            "    文件 → 导出 → PCB 网表：选择 KiCad 或 OrCAD PCB II，只保存一个 .net 文件。\n"
+            "    文件 → 导出 → KiCad PCB：生成板文件、配套 .net 和 .mapping.json，在 KiCad 10 PCB 编辑器打开板文件。\n"
             "11. 点击画布 ERC 图标或按 Ctrl+Shift+E 查看问题，单击列表项定位；事件追踪显示传播时刻与实例路径。\n"
             "12. 文件 → 导入集中提供 .circ、自定义元件和真值表 CSV；导入 .circ 后保存为 .logic.json。\n"
              "位宽 1–32；多输入逻辑门、可配置选择器、位分组总线、零/符号扩展；RAM/ROM 容量由地址位数设置。\n"
@@ -1700,6 +1704,29 @@ void LogicEditor::exportLogicNetlist() {
     writeAtomic(fsPath(dialog.GetPath()), content);
 }
 
+void LogicEditor::exportPhysicalNetlist() {
+    canvas->cancel();
+    const wxString formats[] = {U("KiCad (.net)"), U("OrCAD PCB II (.net)")};
+    wxSingleChoiceDialog format(this, U("选择 PCB 网表格式"), U("导出 PCB 网表"), 2, formats);
+    format.SetName("export-pcb-netlist-format-dialog");
+    format.SetSelection(0);
+    if (format.ShowModal() != wxID_OK)
+        return;
+    const bool orcad = format.GetSelection() == 1;
+    const auto content = exportPcbNetlist(history.project, current,
+                                         orcad ? PcbNetlistFormat::OrCadPcb2 : PcbNetlistFormat::KiCad);
+    wxFileDialog file(this, orcad ? U("导出 OrCAD PCB II 网表") : U("导出 KiCad 网表"), "",
+                      orcad ? "circuit-orcad.net" : "circuit-kicad.net",
+                      orcad ? "OrCAD PCB II (*.net)|*.net" : "KiCad (*.net)|*.net",
+                      wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    file.SetName("export-pcb-netlist-file-dialog");
+    if (file.ShowModal() != wxID_OK)
+        return;
+    if (!file.GetPath().Lower().EndsWith(".net"))
+        throw std::runtime_error("PCB 网表请使用 .net 后缀保存");
+    writeAtomic(fsPath(file.GetPath()), content);
+}
+
 void LogicEditor::exportKiCadPcb() {
     canvas->cancel();
     // 先检查实体映射；不支持的器件在选择保存位置前提示，不生成半成品。
@@ -1729,6 +1756,7 @@ void LogicEditor::exportKiCadPcb() {
                "请在 KiCad PCB 编辑器中打开：\n" + board.u8string() +
                "\n\n配套网表：\n" + netlist.u8string() + "\n引脚映射：\n" + mapping.u8string() +
                "\n\n支持单比特二输入 AND/OR/NAND/XOR 及 NOT，包含电源、去耦和连接器。\n"
+               "同型号的门共用芯片，板文件使用 KiCad 10 标准封装。\n"
                "板文件未布线，请继续布局、布线和设计规则检查。");
 }
 
@@ -2930,7 +2958,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder, bool experiments
             throw std::runtime_error("file import/export menu or dropdown missing");
         const std::vector<int> expected = group == L_IMPORT_MENU
             ? std::vector<int>{L_IMPORT_CIRC, L_LOAD_COMPONENT, L_IMPORT_TABLE}
-            : std::vector<int>{L_PNG, L_BATCH_PNG, L_CSV, L_NETLIST_JSON, L_PCB, L_SAVE_COMPONENT};
+            : std::vector<int>{L_PNG, L_BATCH_PNG, L_CSV, L_NETLIST_JSON, L_NETLIST_PCB, L_PCB, L_SAVE_COMPONENT};
         for (auto m : {item->GetSubMenu(), tool->GetDropdownMenu()}) {
             std::vector<int> actual;
             for (auto entry : m->GetMenuItems())
@@ -3485,7 +3513,7 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder, bool experiments
         canvas->exportPng(wxString((folder / ("logic-" + name + ".png")).wstring()));
     }
     // 验证真实的自定义元件对话框，以及用户会走的历史/库/画布路径。
-    for (int id : {L_NEW_COMPONENT, L_SAVE_COMPONENT, L_LOAD_COMPONENT, L_NETLIST_JSON, L_PCB})
+    for (int id : {L_NEW_COMPONENT, L_SAVE_COMPONENT, L_LOAD_COMPONENT, L_NETLIST_JSON, L_NETLIST_PCB, L_PCB})
         if (!GetMenuBar()->FindItem(id))
             throw std::runtime_error("feature menu item missing");
     history.reset(Project{});

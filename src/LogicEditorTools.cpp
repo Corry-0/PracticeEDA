@@ -83,7 +83,22 @@ void LogicEditor::memoryEditor(bool runtime) {
             std::istringstream words(all); std::string word; std::vector<uint32_t> values(capacity,0); size_t address=0;
             while(words>>word) {
                 size_t count=1; auto star=word.find('*');
-                if(star!=std::string::npos) { count=std::stoull(word.substr(0,star)); word=word.substr(star+1); }
+                if(star!=std::string::npos) {
+                    const auto digits=word.substr(0,star);
+                    if(digits.empty() || digits.find_first_not_of("0123456789")!=std::string::npos)
+                        throw std::runtime_error("HEX 重复次数必须为正十进制整数");
+                    // 逐位限额解析，避免溢出、符号及只消费数字前缀。
+                    count=0;
+                    const auto remaining=capacity-address;
+                    for(char digit:digits) {
+                        const auto value=size_t(digit-'0');
+                        if(value>remaining || count>(remaining-value)/10)
+                            throw std::runtime_error("HEX 内容超过当前存储器容量");
+                        count=count*10+value;
+                    }
+                    if(!count) throw std::runtime_error("HEX 重复次数必须大于零");
+                    word=word.substr(star+1);
+                }
                 auto value=hexValue(U(word));
                 if(count>capacity-address) throw std::runtime_error("HEX 内容超过当前存储器容量");
                 for(size_t repeat=0;repeat<count;++repeat) values[address++]=value;
@@ -211,6 +226,27 @@ void LogicEditor::exportBatch() {
     wxTextEntryDialog scaleDialog(this,U("导出比例（0.25–4 倍）"),U("批量 PNG"),"1.5");
     if(scaleDialog.ShowModal()!=wxID_OK) return; double scale;
     if(!scaleDialog.GetValue().ToDouble(&scale)||scale<.25||scale>4) throw std::runtime_error("比例应为 0.25–4");
+    // 先分配整个批次的唯一文件名；Windows 忽略大小写，已有文件也不覆盖。
+    const auto directory=fsPath(folder.GetPath());
+    std::set<wxString> occupied;
+    for(const auto &entry:std::filesystem::directory_iterator(directory))
+        occupied.insert(wxString(entry.path().filename().wstring()).Lower());
+    std::vector<std::filesystem::path> paths;
+    for(const auto &definition:history.project.circuits) {
+        auto name=U(definition.name);
+        for(size_t i=0;i<name.size();++i)
+            if(name[i]<32 || wxString("<>:\"/\\|?*").Find(name[i])!=wxNOT_FOUND) name[i]='_';
+        while(!name.empty() && (name.Last()=='.' || name.Last()==' ')) name.RemoveLast();
+        if(name.empty()) name="circuit";
+        const auto stem=name.BeforeFirst('.').Upper();
+        if(stem=="CON" || stem=="PRN" || stem=="AUX" || stem=="NUL" ||
+           (stem.size()==4 && (stem.StartsWith("COM") || stem.StartsWith("LPT")) &&
+            (wxString("123456789¹²³").Find(stem[3])!=wxNOT_FOUND))) name="_"+name;
+        auto filename=name+".png";
+        for(size_t suffix=2;!occupied.insert(filename.Lower()).second;++suffix)
+            filename=name+"_"+std::to_string(suffix)+".png";
+        paths.push_back(directory/fsPath(filename));
+    }
     // 导出临时定义视图使用独立仿真器；原运行器完整移回，时间、内存与日志均不受影响。
     bool wasRunning=timer.IsRunning(); stop(); canvas->cancel(); auto savedCurrent=current,savedScope=scope,savedRoot=simulationRoot;
     auto savedNavigation=navigation; auto savedView=canvas->view; bool savedAppearance=canvas->appearance;
@@ -219,14 +255,12 @@ void LogicEditor::exportBatch() {
         simulationRoot=savedRoot; navigation=savedNavigation; canvas->view=savedView;
         canvas->appearance=savedAppearance; rebuild(false,true); if(wasRunning)timer.Start(500); };
     try {
+        size_t index=0;
         for(const auto &definition:history.project.circuits) {
             current=definition.name; scope.clear(); canvas->appearance=false;
             simulator=std::make_unique<Simulator>(history.project,current); simulator->settle();
             refreshDiagnostics();
-            std::string name=definition.name;
-            for(auto &c:name) if(std::string("<>:\"/\\|?*").find(c)!=std::string::npos) c='_';
-            auto path=fsPath(folder.GetPath())/std::filesystem::u8path(name+".png");
-            canvas->exportPng(wxString(path.wstring()),scale);
+            canvas->exportPng(wxString(paths[index++].wstring()),scale);
         }
         restore();
     } catch(...) { restore(); throw; }
