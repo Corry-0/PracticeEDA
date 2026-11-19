@@ -1,0 +1,26 @@
+{
+  "format": "PracticeEDA.logic", "version": 1,
+  "name": "实验案例：双寄存器串联", "main": "main", "nextId": 100,
+  "circuits": [{
+    "name": "main", "nodes": [],
+    "parts": [
+      {"id":"data","kind":"Input","label":"Data","circuit":"","at":[100,150],"width":8,"value":9,"data":[]},
+      {"id":"clk","kind":"Clock","label":"CLK","circuit":"","at":[100,420],"width":1,"value":0,"data":[]},
+      {"id":"clr","kind":"Input","label":"CLR","circuit":"","at":[100,600],"width":1,"value":0,"data":[]},
+      {"id":"r1","kind":"Register","label":"R1","circuit":"","at":[430,180],"width":8,"value":5,"data":[]},
+      {"id":"r2","kind":"Register","label":"R2","circuit":"","at":[790,180],"width":8,"value":0,"data":[]},
+      {"id":"q1","kind":"Output","label":"R1 Q","circuit":"","at":[620,70],"width":8,"value":0,"data":[]},
+      {"id":"q2","kind":"Output","label":"R2 Q","circuit":"","at":[1040,190],"width":8,"value":0,"data":[]}
+    ],
+    "wires": [
+      {"id":"w1","a":["data","Y"],"b":["r1","D"],"bends":[]},
+      {"id":"w2","a":["r1","Q"],"b":["r2","D"],"bends":[[620,190],[620,170]]},
+      {"id":"w3","a":["r1","Q"],"b":["q1","A"],"bends":[[580,190],[580,70]]},
+      {"id":"w4","a":["r2","Q"],"b":["q2","A"],"bends":[]},
+      {"id":"w5","a":["clk","Y"],"b":["r1","CLK"],"bends":[[290,420],[290,190]]},
+      {"id":"w6","a":["clk","Y"],"b":["r2","CLK"],"bends":[[680,420],[680,190]]},
+      {"id":"w7","a":["clr","Y"],"b":["r1","CLR"],"bends":[[320,600],[320,210]]},
+      {"id":"w8","a":["clr","Y"],"b":["r2","CLR"],"bends":[[710,600],[710,210]]}
+    ]
+  }]
+}

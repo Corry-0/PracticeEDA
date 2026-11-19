@@ -60,7 +60,7 @@ enum {
     L_GUIDE, L_UP, L_EDIT_DEFINITION, L_MEMORY_INITIAL, L_MEMORY_RUNTIME, L_PIN_LAYOUT,
     L_MONITOR, L_RECENT, L_TEMPLATE, L_BATCH_PNG, L_IMPORT_CIRC, L_IMPORT_MENU, L_EXPORT_MENU,
     L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE, L_DIAGNOSTICS, L_REROUTE, L_EXPERIMENTS,
-    L_NETLIST_PCB,
+    L_NETLIST_PCB, L_WAVEFORMS, L_PROPAGATION, L_PAUSE_CONDITION, L_CLEAR_CONDITION,
     L_RECENT_FIRST = wxID_HIGHEST + 900
 };
 enum PropertyRow { P_CIRCUIT, P_ROTATION, P_WIDTH, P_INPUTS, P_SELECT, P_INPUTWIDTH, P_OUTPUTWIDTH,
@@ -215,7 +215,11 @@ LogicEditor::LogicEditor(wxWindow *parent)
                   {L_RUN, "运行 / 暂停\tF5"},
                   {L_RUN_CYCLES, "运行指定节拍…"},
                   {L_RESET, "复位"},
-                  {L_TRACE, "事件追踪"}});
+                  {L_TRACE, "事件追踪"},
+                  {L_WAVEFORMS, "时序波形…"},
+                  {L_PROPAGATION, "事件传播过程…"},
+                  {L_PAUSE_CONDITION, "设置条件暂停…"},
+                  {L_CLEAR_CONDITION, "清除暂停条件"}});
     bar->GetMenu(4)->Append(L_MEMORY_RUNTIME, U("查看实例运行内存…"));
     bar->GetMenu(4)->Append(L_MEMORY_INITIAL, U("编辑存储器初始内容…"));
     bar->GetMenu(4)->Append(L_MONITOR, U("信号监测 / 连续 CSV 日志…"));
@@ -615,6 +619,10 @@ LogicEditor::LogicEditor(wxWindow *parent)
         simulator->step();
         rebuild(false);
     });
+    bind(L_WAVEFORMS, [this] { showWaveforms(); });
+    bind(L_PROPAGATION, [this] { showPropagation(); });
+    bind(L_PAUSE_CONDITION, [this] { configurePause(); });
+    bind(L_CLEAR_CONDITION, [this] { simulator->clearPauseCondition(); rebuild(false); });
     bind(L_TICK, [this] {
         stop();
         tick();
@@ -622,8 +630,10 @@ LogicEditor::LogicEditor(wxWindow *parent)
     bind(L_RUN, [this] {
         if (timer.IsRunning())
             stop();
-        else
+        else {
+            simulator->resume();
             timer.Start(500);
+        }
         rebuild(false);
     });
     bind(L_RESET, [this] {
@@ -639,9 +649,10 @@ LogicEditor::LogicEditor(wxWindow *parent)
         if (!d.GetValue().ToLong(&n) || n < 1 || n > 100000)
             throw std::runtime_error("节拍数应为 1–100000");
         stop();
+        simulator->resume();
         if (simulator->pending())
             simulator->settle();
-        for (long i = 0; i < n && !simulator->oscillating(); ++i)
+        for (long i = 0; i < n && !simulator->oscillating() && !simulator->conditionPaused(); ++i)
             simulator->tick();          // 全局基础节拍，不把多个独立时钟误称为同一周期。
         rebuild(false);
     });
@@ -977,10 +988,12 @@ void LogicEditor::refreshHierarchy() {
     hierarchy->GetParent()->Layout();
 }
 void LogicEditor::rebuild(bool reset, bool lib) {
+    if (simulator && simulator->conditionPaused()) stop();
     canvas->wireDisplayDirty = true;
     canvas->previewDirty = true;
     if(!scope.empty() && !reset) { canvas->tool="Select"; canvas->appearance=false; }
     if (reset) {
+        ++simulationGeneration;
         stop();
         scope.clear(); navigation.clear(); simulationRoot=current;
         simulator = std::make_unique<Simulator>(history.project, current);
@@ -1020,6 +1033,7 @@ void LogicEditor::rebuild(bool reset, bool lib) {
           "   |   元件=" + std::to_string(circuit().parts.size()) +
           "   导线=" + std::to_string(circuit().wires.size())));
     if(!routingNotice.empty())status->SetLabel(status->GetLabel()+U("   |   "+routingNotice));
+    if(simulator->conditionPaused())status->SetLabel(status->GetLabel()+U("   |   已命中暂停条件；F5/F7/F8 继续"));
     GetMenuBar()
         ->FindItem(L_APPEARANCE)
         ->SetItemLabel(U(canvas->appearance ? "返回电路编辑" : "编辑元件外观"));

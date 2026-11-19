@@ -57,7 +57,7 @@ void artifacts(const Simulator &s, const std::filesystem::path &dir, const std::
 
 int main(int argc, char **argv) {
     try {
-        auto dir = argc > 1 ? std::filesystem::u8path(argv[1]) : std::filesystem::path("qa-features");
+        auto dir = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::path("qa-features");
         std::filesystem::create_directories(dir);
         Project p;
         createComponent(p, "自定义与门", {{"A", false, 1}, {"B", false, 1}, {"Y", true, 1}});

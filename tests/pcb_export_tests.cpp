@@ -168,7 +168,7 @@ int main(int argc,char **argv){try{
     const auto packedOrCad=exportPcbNetlist(packed,"main",PcbNetlistFormat::OrCadPcb2);
     verifyPacking(packedMap);
     verifyOrCadPads(packedOrCad,packedMap);
-    if(argc>1){auto folder=std::filesystem::u8path(argv[1]);std::filesystem::create_directories(folder);
+    if(argc>1){auto folder=std::filesystem::path(argv[1]);std::filesystem::create_directories(folder);
         writeAtomic(folder/"half-adder-orcad.net",orcad);
         saveExchange(folder,"half-adder-physical",exchange);
         saveExchange(folder,"packed-gates",packedExchange);

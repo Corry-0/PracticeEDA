@@ -1030,6 +1030,10 @@ struct Simulator::Impl {
     std::vector<int> parent, widths;
     std::map<uint64_t, std::set<size_t>> queue;
     std::vector<Trace> traces;
+    std::vector<SimulationBatch> batches;
+    std::optional<int> pauseNet;
+    uint32_t pauseValue = 0;
+    bool paused = false, conditionMatched = false;
     std::function<void(const Trace &)> traceSink;
     bool hasSwitches = false;
     uint64_t now = 0;
@@ -1156,6 +1160,9 @@ struct Simulator::Impl {
     void reset() {
         queue.clear();
         traces.clear();
+        batches.clear();
+        paused = false;
+        conditionMatched = false;
         now = 0;
         ticks = 0;
         oscillating = false;
@@ -1765,15 +1772,18 @@ struct Simulator::Impl {
     bool step() {
         // 整批事件都基于旧网络值求值，再统一发布所有变化网络。
         // 若在第一个循环里就更新网络，时钟采样会依赖元件排列顺序。
-        if (queue.empty() || oscillating)
+        if (queue.empty() || oscillating || paused)
             return false;
         auto it = queue.begin();
         now = it->first;
         auto batch = it->second;
         queue.erase(it);
+        SimulationBatch report;
+        report.time = now;
         std::set<int> affected;
         for (auto i : batch) {
             auto &n = nodes[i];
+            report.evaluated.push_back(n.path);
             auto before = n.outputs;
             evaluate(n);
             for (auto &out : n.outputs)
@@ -1795,9 +1805,23 @@ struct Simulator::Impl {
             auto s = hasSwitches ? switched[i] : resolve(net);
             if (s != net.signal) {
                 net.signal = s;
+                std::string name;
+                for (const auto &driver : net.drivers) {
+                    if (!name.empty()) name += ", ";
+                    name += nodes[driver.first].path + ":" + driver.second;
+                }
+                report.changedNets.push_back((name.empty() ? "net#" + std::to_string(i) : name) + " = " + s.text());
                 for (auto user : net.users)
                     queue[now + 1].insert(user);
             }
+        }
+        batches.push_back(std::move(report));
+        if (batches.size() > 128) batches.erase(batches.begin());
+        if (pauseNet) {
+            const auto &signal = nets.at(*pauseNet).signal;
+            const bool matches = signal.defined() && signal.value == pauseValue;
+            if (matches && !conditionMatched) paused = true;
+            conditionMatched = matches;
         }
         return true;
     }
@@ -1822,14 +1846,15 @@ void Simulator::setInput(const std::string &id, uint32_t value) {
     throw std::runtime_error("不是可操作的输入：" + id);
 }
 bool Simulator::step() {
+    resume();
     return impl->step();
 }
 // 连续推进事件批次直到队列为空或预算耗尽；预算耗尽说明电路振荡或传播过长。
 bool Simulator::settle(size_t budget) {
     size_t count = 0;
-    while (!impl->queue.empty() && !impl->oscillating && count++ < budget)
+    while (!impl->queue.empty() && !impl->oscillating && !impl->paused && count++ < budget)
         impl->step();
-    if (!impl->queue.empty()) {
+    if (!impl->queue.empty() && !impl->paused) {
         impl->oscillating = true;
         for (auto &b : impl->queue)
             for (auto i : b.second)
@@ -1841,6 +1866,11 @@ bool Simulator::settle(size_t budget) {
 // 一个基础节拍是用户定义的离散时钟刻度，与传播事件时间和界面播放毫秒数分离。
 // highTicks=lowTicks=1 时保留原来每次 tick 翻转一次的旧工程行为。
 void Simulator::tick() {
+    resume();
+    if (!impl->queue.empty()) {
+        settle();
+        if (impl->paused || impl->oscillating) return;
+    }
     ++impl->ticks;
     for (size_t i = 0; i < impl->nodes.size(); ++i) {
         auto &n = impl->nodes[i];
@@ -1858,6 +1888,25 @@ Signal Simulator::read(const Endpoint &e) const {
     auto it = impl->roots.find(e.key());
     return it == impl->roots.end() ? Signal::unknown(1) : impl->nets[it->second].signal;
 }
+const std::vector<SimulationBatch> &Simulator::batches() const { return impl->batches; }
+void Simulator::setPauseCondition(const Endpoint &endpoint, uint32_t value) {
+    auto found = impl->roots.find(endpoint.key());
+    if (found == impl->roots.end()) throw std::runtime_error("暂停条件端口不存在");
+    const auto &signal = impl->nets.at(found->second).signal;
+    if (signal.width < 32 && value >= (uint32_t(1) << signal.width))
+        throw std::runtime_error("暂停值超出信号位宽");
+    impl->pauseNet = found->second;
+    impl->pauseValue = value;
+    impl->paused = false;
+    impl->conditionMatched = signal.defined() && signal.value == value;
+}
+void Simulator::clearPauseCondition() {
+    impl->pauseNet.reset();
+    impl->paused = false;
+    impl->conditionMatched = false;
+}
+bool Simulator::conditionPaused() const { return impl->paused; }
+void Simulator::resume() { impl->paused = false; }
 std::vector<Signal> Simulator::memory(const std::string &path) const {
     for (const auto &node : impl->nodes)
         if (node.path == path && (node.part.kind == "RAM" || node.part.kind == "ROM"))
