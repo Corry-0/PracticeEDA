@@ -46,6 +46,48 @@ int main() {
         adder("half-adder.logic.json", false);
         adder("full-adder.logic.json", true);
         adder("hierarchical-adder.logic.json", false);
+        auto chain = load("register-chain.logic.json");
+        Simulator pipeline(chain, chain.main);
+        expect(pipeline, {"r1", "Q"}, 5, 8);
+        expect(pipeline, {"r2", "Q"}, 0, 8);
+        pipeline.tick();
+        expect(pipeline, {"r1", "Q"}, 9, 8);
+        expect(pipeline, {"r2", "Q"}, 5, 8);
+        pipeline.setInput("data", 3);
+        pipeline.settle();
+        pipeline.tick();
+        pipeline.tick();
+        expect(pipeline, {"r1", "Q"}, 3, 8);
+        expect(pipeline, {"r2", "Q"}, 9, 8);
+        pipeline.setPauseCondition({"r2", "Q"}, 3);
+        pipeline.tick();
+        pipeline.tick();
+        require(pipeline.conditionPaused(), "Pause condition did not stop on the matching batch");
+        require(!pipeline.oscillating(), "Conditional pause reported oscillation");
+        require(pipeline.read({"r2", "Q"}).value == 3, "Pause observed stale network value");
+        const auto stoppedAt = pipeline.time();
+        pipeline.settle();
+        require(pipeline.time() == stoppedAt, "Paused simulation advanced without resume");
+        require(!pipeline.batches().empty() && pipeline.batches().back().time == stoppedAt,
+                "Propagation batches did not record the paused event");
+        bool simultaneous = false;
+        for (const auto &batch : pipeline.batches()) {
+            bool first = false, second = false;
+            for (const auto &path : batch.evaluated) {
+                first = first || path == "r1";
+                second = second || path == "r2";
+            }
+            simultaneous = simultaneous || (first && second);
+        }
+        require(simultaneous, "Shared clock registers were not evaluated in one batch");
+        pipeline.tick();
+        require(!pipeline.conditionPaused(), "Continue retriggered an unchanged condition");
+        pipeline.clearPauseCondition();
+        for (int i = 0; i < 100; ++i) pipeline.tick();
+        require(pipeline.batches().size() <= 128, "Propagation history grew without limit");
+        pipeline.reset();
+        expect(pipeline, {"r1", "Q"}, 5, 8);
+        expect(pipeline, {"r2", "Q"}, 0, 8);
         auto bus = load("bus-register.logic.json");
         Simulator reg(bus, bus.main);
         expect(reg, {"p3", "Q"}, 0, 8);

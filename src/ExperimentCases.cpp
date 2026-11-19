@@ -35,6 +35,14 @@ const std::vector<ExperimentCase> &experimentCases() {
          "4. 按 F5 可运行或暂停，观察 Q 和十六进制显示。\n\n"
          "预期结果\n输入改变不会立即更新 Q；每个上升沿捕获当前 Data，其他时刻保持原值。\n\n"
          "提示\n每次 F8 是一个基础节拍，默认两次节拍构成一个完整时钟周期。"},
+        {"双寄存器串联", "register-chain.logic.json",
+         "实验目的\n观察两个寄存器在同一上升沿读取旧网络，数据逐拍传递。\n\n"
+         "1. 初始 Data=9、R1=5、R2=0。打开仿真菜单的时序波形，选择 CLK、Data、R1/Q、R2/Q。\n"
+         "2. 按一次 F8：R1=9、R2=5。第一次上升沿不会把 9 直接传到 R2。\n"
+         "3. 选中 Data，把输入值改成 3。再按两次 F8：R1=3、R2=9。\n"
+         "4. 仿真 → 事件传播过程，可查看同一批求值和统一发布的网络变化。\n"
+         "5. 仿真 → 设置条件暂停，选择 R2/Q，值设为 3，按 F5 运行直到命中。\n\n"
+         "数值按十进制描述，画布可能以十六进制显示。复位恢复案例初值。"},
         {"4 位计数器", "counter.logic.json",
          "实验目的\n观察同步计数、计数使能、异步清零和终端计数输出。\n\n"
          "操作步骤\n1. 初始 EN = 1、CLR = 0、Q = 0。按 F8，首个上升沿得到 Q = 1。\n"
@@ -235,6 +243,7 @@ void LogicEditor::runExperimentSmoke(const std::filesystem::path &folder) {
     guide->Destroy();
     history.markSaved();
     writeAtomic(folder / "EXPERIMENTS-PASS.txt",
-                "Six editable experiment copies loaded and simulated; originals unchanged; save path cleared; modeless guide, chooser cancellation and selection/open passed.\n");
+                "Seven editable experiment copies loaded and simulated; originals unchanged; save path cleared; modeless guide, chooser cancellation and selection/open passed.\n");
+    runSimulationToolsSmoke(folder);
 }
 } // namespace eda::logic

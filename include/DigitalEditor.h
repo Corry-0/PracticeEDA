@@ -30,6 +30,7 @@ class LogicEditor : public wxFrame {
     std::shared_ptr<std::ofstream> traceFile;
     std::set<std::string> monitoredSignals;
     std::unique_ptr<Simulator> simulator;
+    uint64_t simulationGeneration = 0;
     LogicCanvas *canvas;
     wxTreeCtrl *tree;
     std::map<std::string, int> iconIds;
@@ -108,6 +109,10 @@ class LogicEditor : public wxFrame {
     void showExperimentCases();
     bool openExperimentCase(size_t index);
     void runExperimentSmoke(const std::filesystem::path &folder);
+    void showWaveforms();
+    void showPropagation();
+    void configurePause();
+    void runSimulationToolsSmoke(const std::filesystem::path &);
     friend class LogicCanvas;
 };
 // 视口坐标与临时手势状态都放在这里；已提交的数据始终保存在工程模型中。

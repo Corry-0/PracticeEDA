@@ -127,6 +127,11 @@ struct Trace {
     uint64_t time;
     std::string object, pin, value;
 };
+struct SimulationBatch {
+    uint64_t time = 0;
+    std::vector<std::string> evaluated;
+    std::vector<std::string> changedNets;
+};
 class Simulator {
   public:
     Simulator(const Project &, const std::string &circuit);
@@ -156,6 +161,12 @@ class Simulator {
     uint64_t cycles() const;
     // 是否因事件预算耗尽而判定为振荡（为真时 step/settle 不再推进）。
     bool oscillating() const;
+    // 调试信息在每个完整事件批次发布后更新，不改变采样顺序。
+    const std::vector<SimulationBatch> &batches() const;
+    void setPauseCondition(const Endpoint &, uint32_t value);
+    void clearPauseCondition();
+    bool conditionPaused() const;
+    void resume();
     // 导出已编译的连接关系，不推进事件、不改变仿真状态。
     // JSON 保留总线与别名；KiCad S-expression 把总线引脚逐位展开。
     std::string netlist(bool kicad = false) const;

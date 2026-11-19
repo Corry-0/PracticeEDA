@@ -326,7 +326,7 @@ void partialAndValidationTests() {
     check(serialize(deserialize(native)) == native, "existing native file format preserved");
 }
 void exampleTest() {
-    auto p = importCirc(readFile(std::filesystem::path(LOGIC_EXAMPLES_DIR) / "circ-limited.circ"));
+    auto p = importCirc(readFile(std::filesystem::u8path(LOGIC_EXAMPLES_DIR) / "circ-limited.circ"));
     check(circDiagnostics(p.circuit("main")).size() == 1 && part(p, "未支持示例").kind == "Add",
           "example Adder is now supported with real arithmetic behavior");
     Simulator s(p, "main");

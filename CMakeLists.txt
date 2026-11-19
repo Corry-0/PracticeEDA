@@ -10,13 +10,13 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
 set(EDA_CORE_HEADERS include/LogicSupport.h include/Digital.h include/LogicAnalysis.h include/PcbExport.h include/LogicRouting.h)
 set(EDA_CORE_SOURCES src/LogicSupport.cpp src/Digital.cpp src/CustomComponents.cpp src/Shapes.cpp src/CircImport.cpp src/LogicAnalysis.cpp src/PcbExport.cpp src/LogicRouting.cpp)
 set(EDA_GUI_HEADERS include/WxSupport.h include/LogicIcons.h include/LogicSymbols.h include/DigitalEditor.h)
-set(EDA_GUI_SOURCES src/App.cpp src/LogicIcons.cpp src/LogicSymbols.cpp src/DigitalEditor.cpp src/LogicEditorTools.cpp src/LogicDiagnostics.cpp src/LogicWireTools.cpp src/ExperimentCases.cpp tests/editor_module_tests.cpp)
+set(EDA_GUI_SOURCES src/App.cpp src/LogicIcons.cpp src/LogicSymbols.cpp src/DigitalEditor.cpp src/LogicEditorTools.cpp src/LogicDiagnostics.cpp src/LogicWireTools.cpp src/ExperimentCases.cpp src/SimulationTools.cpp tests/editor_module_tests.cpp)
 set(EDA_DOCUMENTS README.md docs/VISUAL_STUDIO_CN.md docs/DIGITAL_LOGIC_CN.md
     docs/CUSTOM_COMPONENTS_NETLIST_CN.md docs/CIRC_IMPORT_CN.md docs/PCB_EXCHANGE_CN.md docs/CODE_GUIDE_CN.md docs/TEST_REPORT_CN.md docs/OPTIMIZATION_ACCEPTANCE_CN.md docs/ROUTING_CN.md resources/ICONS.md)
 set(EDA_EXAMPLES examples/half-adder.logic.json examples/bus-register.logic.json examples/defense-hierarchy.logic.json
     examples/hierarchical-adder.logic.json examples/half-adder.component.json examples/drawn-half-adder.component.json examples/circ-limited.circ
     examples/half-adder-physical.net examples/half-adder-physical.kicad_pcb examples/half-adder-physical.mapping.json
-    examples/full-adder.logic.json examples/counter.logic.json examples/ram-read-write.logic.json)
+    examples/full-adder.logic.json examples/counter.logic.json examples/ram-read-write.logic.json examples/register-chain.logic.json)
 file(GLOB EDA_ICON_RESOURCES CONFIGURE_DEPENDS "resources/wxwidgets/*" "resources/reference/*")
 set_source_files_properties(${EDA_ICON_RESOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
 source_group("图标资源" FILES ${EDA_ICON_RESOURCES})

@@ -1,6 +1,7 @@
 # Configure, compile and run regressions before publishing a local distribution directory.
 param(
     [string]$WxRoot = "",
+    [ValidateSet("Visual Studio 17 2022", "Visual Studio 18 2026")][string]$Generator = "Visual Studio 17 2022",
     [ValidateSet("Debug", "Release")][string]$Configuration = "Release",
     [switch]$Package,
     [switch]$GuiTest,
@@ -9,6 +10,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $edaRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $edaBuild = Join-Path $edaRoot 'build'
+if ($Generator -eq 'Visual Studio 18 2026') {
+    $edaBuild = Join-Path $edaRoot 'build-vs2026'
+}
 $edaCmake = (Get-Command cmake -ErrorAction SilentlyContinue).Source
 if (-not $edaCmake) {
     $edaVsWhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -24,7 +28,7 @@ if (-not $WxRoot) {
     $edaCandidate = Join-Path (Split-Path $edaRoot -Parent) 'wxWidgets'
     if (Test-Path -LiteralPath (Join-Path $edaCandidate 'include\wx\wx.h')) { $WxRoot = $edaCandidate }
 }
-$edaConfigure = @('-S', $edaRoot, '-B', $edaBuild, '-G', 'Visual Studio 17 2022', '-A', 'x64')
+$edaConfigure = @('-S', $edaRoot, '-B', $edaBuild, '-G', $Generator, '-A', 'x64')
 if ($WxRoot) {
     $edaConfigure += "-DwxWidgets_ROOT_DIR=$WxRoot"
     $edaConfigure += "-DwxWidgets_LIB_DIR=$(Join-Path $WxRoot 'lib\vc_x64_lib')"
