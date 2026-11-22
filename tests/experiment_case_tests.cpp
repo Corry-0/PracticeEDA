@@ -40,12 +40,80 @@ void adder(const char *file, bool full) {
         expect(sim, {id(project, full ? "Cout" : "Carry"), "A"}, sum >> 1, 1);
     }
 }
+void requireDiscreteFlipFlops(const Project &project) {
+    const auto &parts = project.circuit(project.main).parts;
+    require(std::count_if(parts.begin(), parts.end(), [](const Part &part) {
+        return part.kind == "DFF" && part.width == 1;
+    }) == 4, "Register experiment must contain four individual D flip-flops");
+}
+void parallelRegister() {
+    auto project = load("dff-parallel-register.logic.json");
+    requireDiscreteFlipFlops(project);
+    Simulator sim(project, project.main);
+    const auto input = id(project, "D[3:0]");
+    const Endpoint output{id(project, "Q[3:0]"), "A"};
+    const auto clear = id(project, "CLR");
+    expect(sim, output, 0, 4);
+    sim.tick();
+    expect(sim, output, 0xA, 4);
+    sim.setInput(input, 0x5);
+    expect(sim, output, 0xA, 4);
+    sim.tick();
+    expect(sim, output, 0xA, 4);
+    sim.tick();
+    expect(sim, output, 0x5, 4);
+    sim.setInput(clear, 1);
+    expect(sim, output, 0, 4);
+    sim.setInput(clear, 0);
+    expect(sim, output, 0, 4);
+    for (uint32_t word = 0; word < 16; ++word) {
+        sim.tick(); // CLK remains a shared clock, including on a falling edge.
+        sim.setInput(input, word);
+        sim.settle();
+        sim.tick();
+        expect(sim, output, word, 4);
+    }
+}
+void serialShiftRegister() {
+    auto project = load("dff-serial-shift-register.logic.json");
+    requireDiscreteFlipFlops(project);
+    Simulator sim(project, project.main);
+    const auto input = id(project, "DIN");
+    auto expectWord = [&](uint32_t word) {
+        for (int bit = 0; bit < 4; ++bit)
+            expect(sim, {id(project, "Q" + std::to_string(bit)), "A"}, (word >> bit) & 1U, 1);
+    };
+    expectWord(0);
+    sim.setInput(input, 1);
+    expectWord(0);
+    sim.tick();
+    expectWord(1);
+    sim.setInput(input, 0);
+    expectWord(1);
+    uint32_t previous = 1;
+    for (uint32_t word : {2U, 4U, 8U, 0U}) {
+        sim.tick();
+        expectWord(previous);
+        sim.tick();
+        expectWord(word);
+        previous = word;
+    }
+    sim.setInput(input, 1);
+    sim.settle();
+    for (int i = 0; i < 8; ++i)
+        sim.tick();
+    expectWord(0xF);
+    sim.setInput(id(project, "CLR"), 1);
+    expectWord(0);
+}
 } // namespace
 int main() {
     try {
         adder("half-adder.logic.json", false);
         adder("full-adder.logic.json", true);
         adder("hierarchical-adder.logic.json", false);
+        parallelRegister();
+        serialShiftRegister();
         auto bus = load("bus-register.logic.json");
         Simulator reg(bus, bus.main);
         expect(reg, {"p3", "Q"}, 0, 8);
@@ -109,7 +177,7 @@ int main() {
         require(serialize(ram) == before, "Simulation modified the case template");
         mem.reset();
         expect(mem, {"ram", "Q"}, 0, 8);
-        std::cout << "Six experiment cases: truth tables, register edges, counter wrap/enable/clear, RAM read/write/reset passed\n";
+        std::cout << "Eight experiment cases: adders, parallel register, serial shift, register edges, counter, and RAM passed\n";
         return 0;
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

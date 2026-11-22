@@ -2,10 +2,12 @@
 #include <limits>
 #include <numeric>
 #include <queue>
+#include <tuple>
 
 namespace eda::logic {
 namespace {
 constexpr double epsilon = 1e-6, clearance = 10, laneSpacing = 10;
+constexpr double crossingClearance = 18;
 bool near(double a, double b) { return std::abs(a - b) < epsilon; }
 bool same(Point a, Point b) { return near(a.x, b.x) && near(a.y, b.y); }
 struct Rect {
@@ -130,6 +132,33 @@ struct Search {
     const std::vector<Rect> &obstacles;
     const std::vector<Segment> &lanes;
     int net;
+    bool preferClearCrossings;
+    // A crossing at a grid vertex belongs to the arriving step. Counting only strict
+    // segment interiors lets the search cross for free at precisely those vertices.
+    double crossingCost(Point from, Point to, bool turning) const {
+        const bool horizontal = near(from.y, to.y);
+        double cost = 0;
+        for (const auto &s : lanes) {
+            if (s.net == net)
+                continue;
+            if (!preferClearCrossings) {
+                if (crossing(from, to, s.a, s.b) || crossing(s.a, s.b, from, to))
+                    cost += 30;
+                continue;
+            }
+            if (turning && segmentDistance(from, s.a, s.b) < crossingClearance)
+                cost += 160;
+            if (horizontal == near(s.a.y, s.b.y))
+                continue;
+            const Point hit = horizontal ? Point{s.a.x, from.y} : Point{from.x, s.a.y};
+            if (same(hit, from) || segmentDistance(hit, from, to) > epsilon ||
+                segmentDistance(hit, s.a, s.b) > epsilon)
+                continue;
+            const double room = std::min(distance(hit, s.a), distance(hit, s.b));
+            cost += room < crossingClearance ? 190 : 42;
+        }
+        return cost;
+    }
     bool clear(Point a, Point b, const std::string &stubObject = {}) const {
         for (const auto &rect : obstacles) if (rect.object != stubObject && rect.cuts(a, b)) return false;
         for (const auto &s : lanes) if (s.net != net && parallelTooClose(a, b, s)) return false;
@@ -150,6 +179,13 @@ struct Search {
             Rect rect{std::min(s.a.x,s.b.x)-laneSpacing,std::min(s.a.y,s.b.y)-laneSpacing,
                       std::max(s.a.x,s.b.x)+laneSpacing,std::max(s.a.y,s.b.y)+laneSpacing,{}};
             if (!rect.touches(area)) continue;
+            if (preferClearCrossings) {
+                // Give the search lanes beyond both ends and on either side of a bend.
+                for (auto end : {s.a,s.b}) for (double delta : {-20.,20.}) {
+                    if(end.x+delta>=area.l && end.x+delta<=area.r) xs.push_back(end.x+delta);
+                    if(end.y+delta>=area.t && end.y+delta<=area.b) ys.push_back(end.y+delta);
+                }
+            }
             if (near(s.a.x,s.b.x)) { xs.push_back(rect.l); xs.push_back(rect.r); }
             else { ys.push_back(rect.t); ys.push_back(rect.b); }
         }
@@ -191,8 +227,8 @@ struct Search {
             for(auto next:neighbors) {
                 if(invalid(next.first))continue;auto there=point(next.first);if(!clear(here,there))continue;
                 double extra=distance(here,there)+(direction&&direction!=next.second?18:0);
-                for(const auto &s:lanes)if(s.net!=net &&
-                    (crossing(here,there,s.a,s.b)||crossing(s.a,s.b,here,there)))extra+=30;
+                if(preferClearCrossings && (b.x-a.x)*(there.x-here.x)<0) extra+=3*std::abs(there.x-here.x);
+                extra += crossingCost(here,there,direction && direction!=next.second);
                 const auto state=next.first*3+next.second;const double cost=top.cost+extra;
                 if(cost+epsilon>=costs[state])continue;
                 costs[state]=cost;previous[state]=top.state;
@@ -214,15 +250,28 @@ bool sameGeometry(const Project &a, const Part &pa, const Project &b, const Part
 }
 } // namespace
 
-WireRoute routeWire(const Project &p, const Circuit &c, const Wire &w, const std::vector<Point> &via) {
+static WireRoute findRoute(const Project &p, const Circuit &c, const Wire &w, const std::vector<Point> &via, bool preferClearCrossings) {
     if(w.a==w.b)return {{},"起点和终点相同"};
     const auto a=endpoint(p,c,w.a),b=endpoint(p,c,w.b),ea=escape(p,c,w.a),eb=escape(p,c,w.b);
     Nets nets(c,&w);const int net=nets.net(w.a);const auto lanes=segments(p,c,nets,w.id);
     std::vector<Rect> obstacles;
-    for(const auto &part:c.parts)if(part.kind!="Text")obstacles.push_back(body(p,part));
+    for(const auto &part:c.parts)if(part.kind!="Text") {
+        auto rect=body(p,part);
+        if(preferClearCrossings && !part.rotation) {
+            rect.t-=24;  // label above the symbol
+            rect.b+=24;  // displayed logic value
+            if(part.kind=="Input" || part.kind=="Output") {
+                const double labelHalf=std::max(40.,4.*(part.label.size()+10));
+                // Only the upper band extends sideways, leaving the pin escape corridor open.
+                obstacles.push_back({part.at.x-labelHalf,rect.t,part.at.x+labelHalf,
+                                     part.at.y-partSize(p,part).y/2-4,part.id});
+            }
+        }
+        obstacles.push_back(rect);
+    }
     for(const auto &node:c.nodes)if(nets.net({node.id,""})!=net)
         obstacles.push_back({node.at.x-6,node.at.y-6,node.at.x+6,node.at.y+6,node.id});
-    const Search search{obstacles,lanes,net};
+    const Search search{obstacles,lanes,net,preferClearCrossings};
     if(!search.clear(a,ea,w.a.object)||!search.clear(eb,b,w.b.object))
         return {{},"引脚出线空间被元件或其他网络占用"};
     std::vector<Point> targets{ea};targets.insert(targets.end(),via.begin(),via.end());targets.push_back(eb);
@@ -240,14 +289,19 @@ WireRoute routeWire(const Project &p, const Circuit &c, const Wire &w, const std
     return {result,{}};
 }
 
-RerouteResult rerouteWires(const Project &p, Circuit &c, const std::set<std::string> &ids) {
+WireRoute routeWire(const Project &p, const Circuit &c, const Wire &w, const std::vector<Point> &via) {
+    return findRoute(p,c,w,via,false);
+}
+
+RerouteResult rerouteWires(const Project &p, Circuit &c, const std::set<std::string> &ids, bool preferClearCrossings) {
     RerouteResult report;
     std::set<std::string> pending=ids,changedIds;
     // 同一次局部移动可能先释放其他线路占用的出线口，再重试此前被阻挡的关联线。
     for(int pass=0;pass<3&&!pending.empty();++pass) {
         std::set<std::string> failed;
         for(auto &w:c.wires)if(pending.count(w.id)) {
-            const auto routed=routeWire(p,c,w);
+            auto routed=findRoute(p,c,w,{},preferClearCrossings);
+            if(!routed.ok() && preferClearCrossings) routed=routeWire(p,c,w);
             if(!routed.ok()){failed.insert(w.id);continue;}
             const auto old=wirePoints(p,c,w);bool changed=old.size()!=routed.points.size();
             if(!changed)for(size_t i=0;i<old.size();++i)if(!same(old[i],routed.points[i])){changed=true;break;}
@@ -316,5 +370,71 @@ std::map<std::string,std::vector<Point>> wireCrossings(const Project &p,const Ci
         if(std::none_of(points.begin(),points.end(),[&](Point q){return same(q,*at);}))points.push_back(*at);
     }
     return result;
+}
+
+bool WireLayoutQuality::operator<(const WireLayoutQuality &rhs) const {
+    return std::tie(crowded, crossings, bends, length) <
+           std::tie(rhs.crowded, rhs.crossings, rhs.bends, rhs.length);
+}
+WireLayoutQuality wireLayoutQuality(const Project &p, const Circuit &c) {
+    Nets nets(c);
+    const auto lines = segments(p, c, nets);
+    WireLayoutQuality score;
+    std::map<std::tuple<int, int, double, double>, bool> hits;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        const auto &a = lines[i];
+        score.length += distance(a.a, a.b);
+        if (i && lines[i - 1].wire == a.wire)
+            ++score.bends;
+        for (size_t j = 0; j < i; ++j) {
+            const auto &b = lines[j];
+            const bool horizontal = near(a.a.y, a.b.y);
+            if (a.net == b.net || horizontal == near(b.a.y, b.b.y))
+                continue;
+            const Point hit = horizontal ? Point{b.a.x, a.a.y} : Point{a.a.x, b.a.y};
+            if (segmentDistance(hit, a.a, a.b) > epsilon || segmentDistance(hit, b.a, b.b) > epsilon)
+                continue;
+            auto &crowded = hits[{std::min(a.net, b.net), std::max(a.net, b.net), hit.x, hit.y}];
+            crowded = crowded || std::min({distance(hit, a.a), distance(hit, a.b), distance(hit, b.a),
+                                           distance(hit, b.b)}) < crossingClearance;
+        }
+    }
+    score.crossings = hits.size();
+    for (const auto &entry : hits)
+        if (entry.second)
+            ++score.crowded;
+    return score;
+}
+std::vector<WireStroke> visibleWireStrokes(const std::vector<Point> &path,
+                                           const std::vector<Point> &crossings, double radius) {
+    std::vector<WireStroke> strokes;
+    for (size_t i = 1; i < path.size(); ++i) {
+        const auto a = path[i - 1], b = path[i];
+        const auto lo = std::min(a.y, b.y), hi = std::max(a.y, b.y);
+        std::vector<double> cuts;
+        if (near(a.x, b.x)) {
+            for (auto q : crossings)
+                if (near(q.x, a.x) && q.y > lo + epsilon && q.y < hi - epsilon)
+                    cuts.push_back(q.y);
+        }
+        if (cuts.empty()) {
+            strokes.emplace_back(a, b);
+            continue;
+        }
+        std::sort(cuts.begin(), cuts.end());
+        cuts.erase(std::unique(cuts.begin(), cuts.end(), near), cuts.end());
+        double from = lo;
+        for (size_t j = 0; j < cuts.size(); ++j) {
+            const double y = cuts[j];
+            // Leave ink between the gap and a bend, and between consecutive crossings at low zoom.
+            const double room =
+                std::min(y - (j ? cuts[j - 1] : lo), (j + 1 < cuts.size() ? cuts[j + 1] : hi) - y);
+            const double gap = std::min(radius, room * 0.35);
+            strokes.emplace_back(Point{a.x, from}, Point{a.x, y - gap});
+            from = y + gap;
+        }
+        strokes.emplace_back(Point{a.x, from}, Point{a.x, hi});
+    }
+    return strokes;
 }
 } // namespace eda::logic

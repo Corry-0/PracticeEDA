@@ -11,7 +11,6 @@ void verifyOrCadPads(const std::string &text,const nlohmann::json &manifest) {
     const std::regex pin(R"(\s*\(\s*(\d+)\s+(\S+)\s+\))");
     const std::map<std::string,std::string> orcadNames{
         {"Package_DIP:DIP-14_W7.62mm","DIP-14_W7.62mm"},
-        {"Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm","C_Disc_D5.0mm_W2.5mm_P5.00mm"},
         {"Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical","PinHeader_1x02_P2.54mm_Vertical"},
     };
     std::map<std::string,std::string> footprints;
@@ -88,19 +87,19 @@ void verifyPacking(const nlohmann::json &manifest) {
     std::map<std::string,std::map<int,std::string>> pads;
     std::map<std::string,Json> chips;
     std::map<std::string,std::string> signals;
-    size_t caps=0;
     for(const auto &c:manifest["components"]) {
         const auto ref=c["ref"].get<std::string>();
         for(const auto &p:c["pads"])pads[ref][p["pad"].get<int>()]=p["name"].get<std::string>();
         if(ref.front()=='U')chips[ref]=c;
-        if(ref.front()=='C') {
-            ++caps;
-            if(pads.at(ref)!=std::map<int,std::string>{{1,"VCC"},{2,"GND"}})
-                throw std::runtime_error("Packed chip decoupling is not on the supply rails");
+        else if(ref.front()=='J'&&pads.at(ref).size()==2&&pads.at(ref).at(2)=="GND") {
+            if(!signals.emplace(c["path"].get<std::string>(),pads.at(ref).at(1)).second)
+                throw std::runtime_error("Duplicate PCB signal port: "+ref);
+        } else {
+            throw std::runtime_error("Extra PCB component: "+ref);
         }
-        if(ref.front()=='J')signals[c["path"].get<std::string>()]=pads.at(ref).at(1);
     }
-    if(chips.size()!=4||caps!=4)throw std::runtime_error("5 AND and 7 NOT gates must use two packages each");
+    if(chips.size()!=4)throw std::runtime_error("5 AND and 7 NOT gates must use two packages each");
+    if(signals.size()!=14)throw std::runtime_error("Expected exactly 14 signal connectors");
 
     const std::vector<Json> quad{{{"A",1},{"B",2},{"Y",3}},{{"A",4},{"B",5},{"Y",6}},
                                  {{"A",9},{"B",10},{"Y",8}},{{"A",12},{"B",13},{"Y",11}}};
@@ -109,6 +108,8 @@ void verifyPacking(const nlohmann::json &manifest) {
     auto verify=[&](const std::string &ref,const std::string &kind,const char *value,const char *symbol,
                     const std::vector<Json> &pinout,size_t used,int first) {
         const auto &chip=chips.at(ref);
+        if(chip["path"]!=kind+std::to_string(first))
+            throw std::runtime_error("Incorrect first gate for chip: "+ref);
         if(chip["value"]!=value||chip["symbol"]!=symbol||chip["footprint"]!="Package_DIP:DIP-14_W7.62mm"||
            chip["units"].size()!=used||pads.at(ref).at(7)!="GND"||pads.at(ref).at(14)!="VCC")
             throw std::runtime_error("Incorrect packed chip metadata or supply wiring: "+ref);
@@ -142,13 +143,13 @@ int main(int argc,char **argv){try{
     auto p=halfAdder();auto before=serialize(p);auto exchange=exportPcb(p,"main");
     if(serialize(p)!=before)throw std::runtime_error("PCB export modified design");
     auto map=nlohmann::json::parse(exchange.manifest);
-    if(map["components"].size()!=9||map["nets"].size()!=6)throw std::runtime_error("Physical component/net counts differ");
-    int chips=0,caps=0;
-    for(const auto &c:map["components"]){auto ref=c["ref"].get<std::string>();if(ref[0]=='U'){
-        ++chips;bool power=false,ground=false;for(const auto &pad:c["pads"]){power|=pad["pad"]==14&&pad["name"]=="VCC";ground|=pad["pad"]==7&&pad["name"]=="GND";}
-        if(!power||!ground)throw std::runtime_error("IC power pins missing");
-    }else if(ref[0]=='C')++caps;}
-    if(chips!=2||caps!=2)throw std::runtime_error("Half adder needs separate AND and XOR packages");
+    if(map["components"].size()!=6||map["nets"].size()!=6)throw std::runtime_error("Physical component/net counts differ");
+    std::map<std::string,std::string> valuesByRef;
+    for(const auto &c:map["components"])
+        valuesByRef.emplace(c["ref"].get<std::string>(),c["value"].get<std::string>());
+    if(valuesByRef!=std::map<std::string,std::string>{
+        {"J1","A"},{"J2","B"},{"J3","Sum"},{"J4","Carry"},{"U1","74HC86"},{"U2","74HC08"}})
+        throw std::runtime_error("Half adder must export only its two gates and four signal ports");
     if(exportPcbNetlist(p,"main",PcbNetlistFormat::KiCad)!=exchange.netlist)
         throw std::runtime_error("Standalone KiCad netlist differs from companion file");
     const auto orcad=exportPcbNetlist(p,"main",PcbNetlistFormat::OrCadPcb2);
@@ -174,5 +175,5 @@ int main(int argc,char **argv){try{
         saveExchange(folder,"packed-gates",packedExchange);
         writeAtomic(folder/"packed-gates-orcad.net",packedOrCad);
         writeAtomic(folder/"packed-gates.logic.json",serialize(packed));}
-    std::cout<<"PCB mapping: standard pinouts, gate packing, spillover and both netlist formats passed\n";return 0;
+    std::cout<<"PCB mapping: gate packing, standard pinouts and both netlist formats passed without extra components\n";return 0;
 }catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}}

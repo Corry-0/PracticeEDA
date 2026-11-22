@@ -76,4 +76,4 @@
 
 选择“文件 → 导出 → KiCad PCB”，默认保存为 `circuit.kicad_pcb`，同时生成同目录的 `circuit.net` 实体连接网表和 `circuit.mapping.json` 引脚映射清单。在 KiCad PCB 编辑器打开 `.kicad_pcb` 继续布局和布线。
 
-实体映射支持单比特、默认二输入且无逐脚反相的 AND/NAND/OR/XOR 及 NOT。同型号的门按标准引脚分配到同一芯片的不同单元，每片补一颗去耦电容；板文件使用 KiCad 10 标准封装。总线、Register、RAM 等未支持的器件会在选择保存位置前提示；这些电路仍可导出逻辑网表 JSON。实际外部加载与范围见 [PCB 交换说明](PCB_EXCHANGE_CN.md)。
+实体映射支持单比特、默认二输入且无逐脚反相的 AND/NAND/OR/XOR 及 NOT。同型号的门可共用一颗 74HC 芯片，每个顶层输入输出端口对应一个信号连接器。电源和常量通过网络表示，板文件使用 KiCad 10 标准封装。总线、Register、RAM 等器件可导出逻辑网表 JSON。实际外部加载与范围见 [PCB 交换说明](PCB_EXCHANGE_CN.md)。

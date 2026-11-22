@@ -248,12 +248,16 @@ void LogicEditor::exportBatch() {
         paths.push_back(directory/fsPath(filename));
     }
     // 导出临时定义视图使用独立仿真器；原运行器完整移回，时间、内存与日志均不受影响。
-    bool wasRunning=timer.IsRunning(); stop(); canvas->cancel(); auto savedCurrent=current,savedScope=scope,savedRoot=simulationRoot;
+    bool wasRunning=timer.IsRunning();
+    const auto remaining = batchRemaining, total = batchTotal;
+    stop(); canvas->cancel(); auto savedCurrent=current,savedScope=scope,savedRoot=simulationRoot;
     auto savedNavigation=navigation; auto savedView=canvas->view; bool savedAppearance=canvas->appearance;
     auto savedSimulator=std::move(simulator);
     auto restore=[&] { simulator=std::move(savedSimulator); current=savedCurrent; scope=savedScope;
         simulationRoot=savedRoot; navigation=savedNavigation; canvas->view=savedView;
-        canvas->appearance=savedAppearance; rebuild(false,true); if(wasRunning)timer.Start(500); };
+        canvas->appearance=savedAppearance;
+        if (wasRunning) { batchRemaining = remaining; batchTotal = total; startPlayback(); }
+        rebuild(false,true); };
     try {
         size_t index=0;
         for(const auto &definition:history.project.circuits) {

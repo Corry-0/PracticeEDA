@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(PracticeEDA VERSION 0.5.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(BUILD_TESTING "Build regression tests" ON)
 option(EDA_BUILD_GUI "Build the wxWidgets editor" ON)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
@@ -10,13 +11,14 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
 set(EDA_CORE_HEADERS include/LogicSupport.h include/Digital.h include/LogicAnalysis.h include/PcbExport.h include/LogicRouting.h)
 set(EDA_CORE_SOURCES src/LogicSupport.cpp src/Digital.cpp src/CustomComponents.cpp src/Shapes.cpp src/CircImport.cpp src/LogicAnalysis.cpp src/PcbExport.cpp src/LogicRouting.cpp)
 set(EDA_GUI_HEADERS include/WxSupport.h include/LogicIcons.h include/LogicSymbols.h include/DigitalEditor.h)
-set(EDA_GUI_SOURCES src/App.cpp src/LogicIcons.cpp src/LogicSymbols.cpp src/DigitalEditor.cpp src/LogicEditorTools.cpp src/LogicDiagnostics.cpp src/LogicWireTools.cpp src/ExperimentCases.cpp tests/editor_module_tests.cpp)
+set(EDA_GUI_SOURCES src/AssistantPanel.cpp src/AssistantCloud.cpp src/App.cpp src/LogicIcons.cpp src/LogicSymbols.cpp src/DigitalEditor.cpp src/LogicEditorTools.cpp src/LogicDiagnostics.cpp src/LogicWireTools.cpp src/LogicTimingTools.cpp src/ExperimentCases.cpp tests/editor_module_tests.cpp)
 set(EDA_DOCUMENTS README.md docs/VISUAL_STUDIO_CN.md docs/DIGITAL_LOGIC_CN.md
     docs/CUSTOM_COMPONENTS_NETLIST_CN.md docs/CIRC_IMPORT_CN.md docs/PCB_EXCHANGE_CN.md docs/CODE_GUIDE_CN.md docs/TEST_REPORT_CN.md docs/OPTIMIZATION_ACCEPTANCE_CN.md docs/ROUTING_CN.md resources/ICONS.md)
 set(EDA_EXAMPLES examples/half-adder.logic.json examples/bus-register.logic.json examples/defense-hierarchy.logic.json
     examples/hierarchical-adder.logic.json examples/half-adder.component.json examples/drawn-half-adder.component.json examples/circ-limited.circ
     examples/half-adder-physical.net examples/half-adder-physical.kicad_pcb examples/half-adder-physical.mapping.json
-    examples/full-adder.logic.json examples/counter.logic.json examples/ram-read-write.logic.json)
+    examples/full-adder.logic.json examples/counter.logic.json examples/ram-read-write.logic.json
+    examples/dff-parallel-register.logic.json examples/dff-serial-shift-register.logic.json)
 file(GLOB EDA_ICON_RESOURCES CONFIGURE_DEPENDS "resources/wxwidgets/*" "resources/reference/*")
 set_source_files_properties(${EDA_ICON_RESOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
 source_group("图标资源" FILES ${EDA_ICON_RESOURCES})
@@ -37,12 +39,10 @@ endif()
 set(EDA_KICAD_FOOTPRINTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/kicad-footprints")
 foreach(footprint IN ITEMS
     "DIP-14_W7.62mm"
-    "C_Disc_D5.0mm_W2.5mm_P5.00mm"
     "PinHeader_1x02_P2.54mm_Vertical")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${EDA_KICAD_FOOTPRINTS}/${footprint}.kicad_mod")
 endforeach()
 file(READ "${EDA_KICAD_FOOTPRINTS}/DIP-14_W7.62mm.kicad_mod" EDA_DIP_FOOTPRINT)
-file(READ "${EDA_KICAD_FOOTPRINTS}/C_Disc_D5.0mm_W2.5mm_P5.00mm.kicad_mod" EDA_CAP_FOOTPRINT)
 file(READ "${EDA_KICAD_FOOTPRINTS}/PinHeader_1x02_P2.54mm_Vertical.kicad_mod" EDA_HEADER_FOOTPRINT)
 configure_file(resources/KiCadFootprints.h.in generated/KiCadFootprints.h @ONLY)
 
@@ -52,6 +52,11 @@ target_include_directories(logic_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gener
 target_include_directories(logic_core SYSTEM PRIVATE third_party)
 target_compile_definitions(logic_core PUBLIC NOMINMAX)
 set_target_properties(logic_core PROPERTIES FOLDER "库")
+if(EDA_BUILD_GUI OR BUILD_TESTING)
+  add_library(assistant_core src/Assistant.cpp include/Assistant.h)
+  target_link_libraries(assistant_core PUBLIC logic_core)
+  target_include_directories(assistant_core SYSTEM PUBLIC third_party)
+endif()
 if(EDA_BUILD_GUI)
   # Discover the existing sibling dependency for both VS Open Folder and .sln workflows.
   # Explicit -DwxWidgets_ROOT_DIR / cache values always take precedence.
@@ -69,7 +74,11 @@ if(EDA_BUILD_GUI)
   add_executable(PracticeEDA WIN32 ${EDA_GUI_HEADERS} ${EDA_CORE_HEADERS} ${EDA_GUI_SOURCES}
       ${EDA_DOCUMENTS} ${EDA_EXAMPLES} ${EDA_ICON_RESOURCES} CMakePresets.json scripts/build.ps1)
   target_include_directories(PracticeEDA PRIVATE resources)
-  target_link_libraries(PracticeEDA PRIVATE logic_core ${wxWidgets_LIBRARIES})
+  target_include_directories(PracticeEDA SYSTEM PRIVATE third_party)
+  if(WIN32)
+    target_link_libraries(PracticeEDA PRIVATE winhttp)
+  endif()
+  target_link_libraries(PracticeEDA PRIVATE assistant_core logic_core ${wxWidgets_LIBRARIES})
   set_target_properties(PracticeEDA PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT PracticeEDA)
   # 案例随可执行文件交付；从任意工作目录启动时都能读取。
@@ -78,9 +87,11 @@ if(EDA_BUILD_GUI)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${EDA_EXAMPLES} "$<TARGET_FILE_DIR:PracticeEDA>/examples"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
-option(BUILD_TESTING "Build regression tests" ON)
 if(BUILD_TESTING)
   enable_testing()
+  add_executable(assistant_tests tests/assistant_tests.cpp)
+  target_link_libraries(assistant_tests PRIVATE assistant_core)
+  add_test(NAME assistant_tests COMMAND assistant_tests)
   add_executable(logic_tests tests/digital_tests.cpp)
   target_link_libraries(logic_tests PRIVATE logic_core)
   target_compile_definitions(logic_tests PRIVATE LOGIC_EXAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples")

@@ -59,7 +59,27 @@ const std::vector<ExperimentCase> &experimentCases() {
          "3. 双击 HalfAdder instance，进入该运行实例，查看内部 XOR、AND 和信号。\n"
          "4. 使用“项目 → 返回上级实例”或 Alt+Up 回到主电路。\n\n"
          "预期结果\n主电路与子电路内部信号一致；进入和返回实例不会复位仿真。\n\n"
-         "编辑提示\n运行实例视图用于观察；修改内部结构请使用“编辑当前电路定义”。"}
+         "编辑提示\n运行实例视图用于观察；修改内部结构请使用“编辑当前电路定义”。"},
+        {"4 位并联寄存器", "dff-parallel-register.logic.json",
+         "实验目的\n用 4 个独立 D 触发器并联搭出 4 位寄存器，观察同一个上升沿同时采样四位。\n\n"
+         "连线\n按位拆分 D[3:0]，DFF0 至 DFF3 各接一位输入。四个触发器共用 CLK 和 CLR，"
+         "四路 Q 按位合并为 Q[3:0]。\n\n"
+         "操作步骤\n1. 初始 D[3:0] = 0xA、Q[3:0] = 0x0、CLK = 0。按一次 F8，Q 更新为 0xA。\n"
+         "2. 选中 D[3:0]，在左侧属性的“初始值”中输入 0x5。此时 Q 仍为 0xA。\n"
+         "3. 按一次 F8 到下降沿，Q 保持 0xA。再按一次 F8 到上升沿，Q 同时更新为 0x5。\n"
+         "4. 双击 CLR 变为 1。无需按 F8，Q 立即清零。\n\n"
+         "波形观察\n对照 CLK、D[3:0] 和 Q[3:0]，比较输入改变、上升沿采样和异步清零的时刻。"
+         "逐位观察时，可在各 DFF 的 Q 引脚上右键，选择“添加到时序波形”。"},
+        {"4 位串联移位寄存器", "dff-serial-shift-register.logic.json",
+         "实验目的\n用 4 个独立 D 触发器串联搭出 4 位移位寄存器，观察一位数据逐级移动。\n\n"
+         "连线\nDIN 接 DFF0 的 D，前一级 Q 接后一级 D。四级共用 CLK 和 CLR。"
+         "Q0 至 Q3 是各级观察点，Q3 也是串行输出。\n\n"
+         "操作步骤\n1. 初始四级均为 0。双击 DIN 置 1，按一次 F8 到第一个上升沿。"
+         "按 Q3 Q2 Q1 Q0 的顺序读取，得到 0001。\n"
+         "2. 把 DIN 改回 0，此时输出仍为 0001。之后每按两次 F8 到下一个上升沿，"
+         "依次得到 0010、0100、1000、0000。\n"
+         "3. 可在 1000 时先双击 CLR 置 1，观察输出立即归零。复位可重新演示。\n\n"
+         "波形观察\n对照 CLK、DIN 和 Q0 至 Q3。每个上升沿，后一级取得前一级在该边沿之前的值。"}
     };
     return cases;
 }
@@ -115,6 +135,7 @@ bool LogicEditor::openExperimentCase(size_t index) {
     canvas->cancel();
     canvas->appearance = false;
     canvas->tool = "Select";
+    resetWaveform(true);
     history.reset(std::move(loaded), false);
     current = history.project.main;
     savedPath.clear(); // 从模板创建副本；Ctrl+S 必须选择新路径。
@@ -219,10 +240,10 @@ void LogicEditor::runExperimentSmoke(const std::filesystem::path &folder) {
             auto list = dynamic_cast<wxListBox *>(wxWindow::FindWindowByName("experiment-case-list", chooser));
             auto text = dynamic_cast<wxTextCtrl *>(wxWindow::FindWindowByName("experiment-case-details", chooser));
             if (list && text) {
-                list->SetSelection(1);
+                list->SetSelection(int(experimentCases().size() - 1));
                 wxCommandEvent select(wxEVT_LISTBOX, list->GetId());
                 list->GetEventHandler()->ProcessEvent(select);
-                dialogVerified = text->GetValue().Contains(U("Cin"));
+                dialogVerified = text->GetValue().Contains(U("0010、0100、1000"));
             }
             chooser->EndModal(dialogVerified ? wxID_OK : wxID_CANCEL);
         }
@@ -230,11 +251,13 @@ void LogicEditor::runExperimentSmoke(const std::filesystem::path &folder) {
     showExperimentCases();
     guide = dynamic_cast<wxDialog *>(wxWindow::FindWindowByName("experiment-guide", this));
     if (!dialogVerified || !guide || !guide->IsShown() || guide->IsModal() || !history.dirty() ||
-        !savedPath.empty() || history.project.name != "实验案例：一位全加器")
+        !savedPath.empty() || history.project.name != "实验案例：4 位串联移位寄存器")
         throw std::runtime_error("Experiment chooser did not open the selected editable copy");
     guide->Destroy();
     history.markSaved();
     writeAtomic(folder / "EXPERIMENTS-PASS.txt",
-                "Six editable experiment copies loaded and simulated; originals unchanged; save path cleared; modeless guide, chooser cancellation and selection/open passed.\n");
+                std::to_string(experimentCases().size()) +
+                    " editable experiment copies loaded and simulated; originals unchanged; save path cleared; "
+                    "modeless guide, chooser cancellation and selection/open passed.\n");
 }
 } // namespace eda::logic

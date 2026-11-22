@@ -1,6 +1,7 @@
 #include "PcbExport.h"
 #include "KiCadFootprints.h"
 #include "json.hpp"
+#include <cstdint>
 #include <iomanip>
 #include <sstream>
 #include <string_view>
@@ -9,7 +10,6 @@ namespace {
 using Json=nlohmann::json;
 std::string quoted(const std::string &s) { std::string v="\"";for(char c:s) {if(c=='"'||c=='\\')v+='\\';v+=c;}return v+'"'; }
 constexpr auto dipFootprint = "Package_DIP:DIP-14_W7.62mm";
-constexpr auto capFootprint = "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm";
 constexpr auto headerFootprint = "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical";
 constexpr int vcc = 1, gnd = 2;
 
@@ -54,8 +54,7 @@ PhysicalNetlist buildPhysicalNetlist(const Project &project,const std::string &c
         }
     }
     for(const auto &n:logical["nets"]) {int id=n["id"].get<int>();if(!netIds.count(id)){netIds[id]=next;netNames[next++]=n["name"].get<std::string>();}}
-    std::vector<Physical> physical;int chip=0,connector=1;
-    physical.push_back({"J1","POWER_5V",headerFootprint,"power",2,{{1,vcc},{2,gnd}}});
+    std::vector<Physical> physical;int chip=0,connector=0;
     std::map<std::string,size_t> lastPackage;
     for(const auto &c:logical["components"]) {
         auto kind=c["kind"].get<std::string>(),source=c["path"].get<std::string>();
@@ -71,16 +70,14 @@ PhysicalNetlist buildPhysicalNetlist(const Project &project,const std::string &c
         const auto &package=spec->second;
         const auto last=lastPackage.find(kind);
         if(last==lastPackage.end()||physical[last->second].gates.size()==package.units.size()) {
-            const auto number=std::to_string(++chip);
-            Physical ic{"U"+number,package.value,dipFootprint,source,14,{{14,vcc},{7,gnd}},package.symbol};
-            // 未使用的 CMOS 输入接地；输出保持无网。被分配的单元再写入实际连接。
+            Physical ic{"U"+std::to_string(++chip),package.value,dipFootprint,source,14,{{14,vcc},{7,gnd}},package.symbol};
+            // 未使用的 CMOS 输入接地。分配单元后，用实际网络覆盖对应输入。
             for(const auto &unit:package.units) {
                 ic.nets[unit.a]=gnd;
                 if(unit.b)ic.nets[unit.b]=gnd;
             }
             lastPackage[kind]=physical.size();
             physical.push_back(std::move(ic));
-            physical.push_back({"C"+number,"100nF",capFootprint,source+"/decoupling",2,{{1,vcc},{2,gnd}}});
         }
         auto &ic=physical[lastPackage.at(kind)];
         const auto pins=package.units.at(ic.gates.size());
@@ -100,6 +97,20 @@ std::string componentStamp(size_t index) {
     return stamp.str();
 }
 
+std::string kiCadComponentId(std::string_view path) {
+    // 连接器使用端口路径，芯片使用其第一个门的路径。网表和板文件共用此 ID。
+    std::uint64_t hash=14695981039346656037ULL; // FNV-1a
+    for(unsigned char c:path) {
+        hash^=c;
+        hash*=1099511628211ULL;
+    }
+    std::ostringstream uuid;
+    uuid<<"e3659efd-1945-800"<<std::hex<<(hash>>60)
+        <<"-8"<<std::setfill('0')<<std::setw(3)<<((hash>>48)&0xfff)
+        <<'-'<<std::setw(12)<<(hash&0xffffffffffffULL);
+    return uuid.str();
+}
+
 template<class Visit>
 void visitNetMembers(const PhysicalNetlist &data,int netId,Visit visit) {
     for(const auto &p:data.components)
@@ -110,10 +121,9 @@ void visitNetMembers(const PhysicalNetlist &data,int netId,Visit visit) {
 std::string writeKiCadNetlist(const PhysicalNetlist &data) {
     std::ostringstream net;
     net<<"(export (version E) (design (source \"PracticeEDA\") (tool \"PracticeEDA 0.5 physical mapping\"))\n (components\n";
-    for(size_t index=0;index<data.components.size();++index) {
-        const auto &p=data.components[index];
+    for(const auto &p:data.components) {
         net<<"  (comp (ref "<<quoted(p.ref)<<") (value "<<quoted(p.value)<<") (footprint "<<quoted(p.footprint)
-           <<") (tstamp "<<quoted(componentStamp(index))<<"))\n";
+           <<") (sheetpath (names \"/\") (tstamps \"/\")) (tstamps "<<quoted(kiCadComponentId(p.path))<<"))\n";
     }
     net<<" )\n (nets\n";
     for(const auto &[id,name]:data.netNames) {
@@ -175,10 +185,10 @@ std::vector<std::string_view> footprintFields(std::string_view libraryFootprint)
 void writeBoardFootprint(std::ostream &out,const Physical &p,const std::map<int,std::string> &netNames,double x,double y) {
     static const std::map<std::string,std::vector<std::string_view>> footprints{
         {dipFootprint,footprintFields(stock::dip)},
-        {capFootprint,footprintFields(stock::capacitor)},
         {headerFootprint,footprintFields(stock::header)},
     };
     out<<" (footprint "<<quoted(p.footprint)<<" (layer \"F.Cu\") (at "<<x<<' '<<y<<")\n";
+    out<<"  (path "<<quoted("/"+kiCadComponentId(p.path))<<")\n";
     std::set<int> pads;
     for(const auto field:footprints.at(p.footprint)) {
         const auto starts=[&](std::string_view prefix) {return field.substr(0,prefix.size())==prefix;};

@@ -11,7 +11,7 @@ from verify_netlists import child, parse
 def footprint_fields(footprint):
     fields = []
     for field in footprint[2:]:
-        if field[0] in {"version", "generator", "generator_version", "layer", "at"}:
+        if field[0] in {"version", "generator", "generator_version", "layer", "at", "path"}:
             continue
         if field[0] == "property" and field[1] in {"Reference", "Value"}:
             fields.append(field[:2] + field[3:])
@@ -23,7 +23,7 @@ def footprint_fields(footprint):
     return fields
 
 
-def verify_stock_footprints(board, manifest):
+def verify_stock_footprints(board, manifest, component_ids):
     library = pathlib.Path(__file__).resolve().parents[1] / "third_party/kicad-footprints"
     components = {component["ref"]: component for component in manifest["components"]}
     seen = set()
@@ -37,6 +37,7 @@ def verify_stock_footprints(board, manifest):
         seen.add(ref)
         component = components[ref]
         assert footprint[1] == component["footprint"] and properties["Value"] == component["value"]
+        assert child(footprint, "path")[1] == "/" + component_ids[ref], ref
         if footprint[1] not in stock:
             name = footprint[1].split(":", 1)[1]
             template = (library / (name + ".kicad_mod")).read_text(encoding="utf-8")
@@ -53,7 +54,6 @@ def verify(cli, folder, base, report, ipc_name):
     if process.returncode:
         raise RuntimeError(process.stderr)
     manifest = json.loads((folder / (base + ".mapping.json")).read_text(encoding="utf-8"))
-    verify_stock_footprints(board, manifest)
     expected = {(net["name"], node["ref"], str(node["pad"]))
                 for net in manifest["nets"] for node in net["members"]}
     actual = set()
@@ -65,6 +65,19 @@ def verify(cli, folder, base, report, ipc_name):
         raise AssertionError({"missing": sorted(expected-actual), "extra": sorted(actual-expected)})
 
     netlist = parse((folder / (base + ".net")).read_text(encoding="utf-8"))
+    parts = child(netlist, "components")[1:]
+    components = {
+        child(part, "ref")[1]: (child(part, "value")[1], child(part, "footprint")[1])
+        for part in parts
+    }
+    assert len(components) == len(parts), "Duplicate netlist references"
+    assert components == {part["ref"]: (part["value"], part["footprint"])
+                          for part in manifest["components"]}, "Netlist components differ from mapping"
+    component_ids = {child(part, "ref")[1]: child(part, "tstamps")[1] for part in parts}
+    assert len(set(component_ids.values())) == len(parts), "Duplicate KiCad component IDs"
+    assert all(re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", uuid)
+               for uuid in component_ids.values()), "Invalid KiCad component ID"
+    verify_stock_footprints(board, manifest, component_ids)
     members = {(child(net, "name")[1], child(node, "ref")[1], child(node, "pin")[1])
                for net in child(netlist, "nets")[1:] for node in net
                if isinstance(node, list) and node[0] == "node"}

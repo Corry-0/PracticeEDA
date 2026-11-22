@@ -49,7 +49,7 @@ void LogicEditor::runModuleSmoke(const std::filesystem::path &folder) {
         traceFile.reset(); monitoredSignals.clear(); stop();
     };
     auto activate = [&](Project project) {
-        cleanTrace(); canvas->cancel(); history.reset(std::move(project)); current=history.project.main;
+        cleanTrace(); canvas->cancel(); resetWaveform(true); history.reset(std::move(project)); current=history.project.main;
         simulationRoot=current; scope.clear(); navigation.clear(); savedPath.clear();
         canvas->selected.clear(); canvas->tool="Select"; canvas->appearance=false; rebuild(true,true);
     };
@@ -329,7 +329,10 @@ void LogicEditor::runModuleSmoke(const std::filesystem::path &folder) {
         DialogResponses hook([&](wxDialog *dialog){if(auto number=dynamic_cast<wxTextEntryDialog *>(dialog)){number->SetValue("3");return wxID_OK;}return wxID_CANCEL;});
         invoke("运行 / 暂停");require(timer.IsRunning(),"run command did not start timer");invoke("运行 / 暂停");require(!timer.IsRunning(),"pause command did not stop timer");
         const auto before=simulator->ticks();invoke("时钟基础节拍");require(simulator->ticks()==before+1,"clock tick was not advanced");
-        invoke("单步传播");invoke("运行指定节拍…");require(simulator->ticks()==before+4,"fixed tick count differs");
+        invoke("单步传播");invoke("运行指定节拍…");
+        require(batchRemaining==3 && timer.IsRunning(),"fixed tick batch was not scheduled");
+        simulationTimer();
+        require(simulator->ticks()==before+4 && !timer.IsRunning(),"fixed tick count differs");
         invoke("复位");require(simulator->ticks()==0&&!timer.IsRunning(),"reset did not restore tick count");
     });
     scenario("M25","New project cancel / save before replacing dirty design",[&] {

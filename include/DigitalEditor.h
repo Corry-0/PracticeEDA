@@ -8,6 +8,8 @@
 
 namespace eda::logic {
 class LogicCanvas;
+class WaveformWindow;
+class AssistantPanel;
 // 持有工程/历史记录与仿真器；所有结构修改都通过 change() 以支持失败回滚。
 class LogicEditor : public wxFrame {
   public:
@@ -18,6 +20,12 @@ class LogicEditor : public wxFrame {
     void closeSmoke();
 
   private:
+    friend class AssistantPanel;
+    uint64_t assistantRevision = 0;
+    AssistantPanel *assistant = nullptr;
+    wxWindow *createAssistant(wxWindow *);
+    void locateObject(std::string id);
+    void runAssistantSmoke(const std::filesystem::path &);
     History history;
     std::string current = "main", savedPath;
     // 电路定义、仿真根和观察实例必须分开；导航不得重建仿真器。
@@ -37,7 +45,7 @@ class LogicEditor : public wxFrame {
     wxTextCtrl *search, *diagnosticDetail;
     wxGrid *properties;
     wxStaticText *propertyHint;
-    wxButton *newCircuitButton, *deleteCircuitButton, *navigateUpButton, *editDefinitionButton;
+    wxButton *newCircuitButton, *deleteCircuitButton, *navigateUpButton, *editDefinitionButton, *clockSettingsButton;
     wxDialog *diagnosticsWindow;
     std::vector<int> diagnosticOrder;
     std::map<std::string, Part> toolDefaults;
@@ -53,6 +61,10 @@ class LogicEditor : public wxFrame {
     wxStaticText *selection, *status, *diagnosticSummary;
     wxListBox *diagnostics;
     wxTimer timer;
+    WaveformWindow *waveform = nullptr;
+    unsigned playbackRate = 2;
+    long batchRemaining = 0, batchTotal = 0;
+    bool waveformOpened = false;
     std::vector<Issue> issues;
     Table lastTable;
     bool hasTable = false;
@@ -67,7 +79,7 @@ class LogicEditor : public wxFrame {
     std::string diagnosticText(const Issue &) const;
     std::optional<std::pair<std::string, Point>> visibleDiagnostic(const Issue &) const;
     void change(const std::function<void()> &action);
-    void showReport(const std::string &title, const std::string &text);
+    void showReport(const std::string &title, const std::string &text, wxWindow *parent = nullptr);
     void showTable(Table table);
     void copySelection();
     void pasteSelection();
@@ -86,6 +98,22 @@ class LogicEditor : public wxFrame {
     void encapsulate();
     void renameCircuit();
     void tick();
+    void advanceTick();
+    void simulationTimer();
+    void requestBatch();
+    void togglePlayback();
+    void startPlayback();
+    void setPlaybackRate(unsigned rate);
+    void playbackSettings();
+    void resetSimulation();
+    void clockSettings();
+    void timingSettings();
+    void openWaveform(bool automatic = false);
+    void addWaveformSignal(const Endpoint &);
+    void chooseWaveformSignals();
+    void resetWaveform(bool clear);
+    void refreshWaveform();
+    void runTimingSmoke(const std::filesystem::path &);
     void undo(bool redo = false);
     bool discard();
     void fail(const std::exception &);
@@ -109,6 +137,7 @@ class LogicEditor : public wxFrame {
     bool openExperimentCase(size_t index);
     void runExperimentSmoke(const std::filesystem::path &folder);
     friend class LogicCanvas;
+    friend class WaveformWindow;
 };
 // 视口坐标与临时手势状态都放在这里；已提交的数据始终保存在工程模型中。
 class LogicCanvas : public wxPanel {

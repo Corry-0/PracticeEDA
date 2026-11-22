@@ -3,191 +3,10 @@
  (layers (0 "F.Cu" signal) (2 "B.Cu" signal) (5 "F.SilkS" user "F.Silkscreen") (7 "B.SilkS" user "B.Silkscreen") (1 "F.Mask" user) (3 "B.Mask" user) (25 "Edge.Cuts" user) (31 "F.CrtYd" user "F.Courtyard") (35 "F.Fab" user))
  (setup (pad_to_mask_clearance 0))
  (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (layer "F.Cu") (at 30 30)
+  (path "/e3659efd-1945-8000-88d5-9707b575eaba")
   (descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
   (tags "Through hole pin header THT 1x02 2.54mm single row")
   (property "Reference" "J1"
-		(at 0 -2.38 0)
-		(layer "F.SilkS")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (property "Value" "POWER_5V"
-		(at 0 4.92 0)
-		(layer "F.Fab")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (property "KiLib_Generator" "connector/pin_header_socket"
-		(at 0 0 0)
-		(layer "F.SilkS")
-		(hide yes)
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (attr through_hole)
-  (duplicate_pad_numbers_are_jumpers no)
-  (fp_line
-		(start -1.38 -1.38)
-		(end 0 -1.38)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start -1.38 0)
-		(end -1.38 -1.38)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start -1.38 1.27)
-		(end -1.38 3.92)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start -1.38 1.27)
-		(end 1.38 1.27)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start -1.38 3.92)
-		(end 1.38 3.92)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start 1.38 1.27)
-		(end 1.38 3.92)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_rect
-		(start -1.77 -1.77)
-		(end 1.77 4.32)
-		(stroke
-			(width 0.05)
-			(type solid)
-		)
-		(fill no)
-		(layer "F.CrtYd")
-	)
-  (fp_line
-		(start -1.27 -0.635)
-		(end -0.635 -1.27)
-		(stroke
-			(width 0.1)
-			(type solid)
-		)
-		(layer "F.Fab")
-	)
-  (fp_line
-		(start -1.27 3.81)
-		(end -1.27 -0.635)
-		(stroke
-			(width 0.1)
-			(type solid)
-		)
-		(layer "F.Fab")
-	)
-  (fp_line
-		(start -0.635 -1.27)
-		(end 1.27 -1.27)
-		(stroke
-			(width 0.1)
-			(type solid)
-		)
-		(layer "F.Fab")
-	)
-  (fp_line
-		(start 1.27 -1.27)
-		(end 1.27 3.81)
-		(stroke
-			(width 0.1)
-			(type solid)
-		)
-		(layer "F.Fab")
-	)
-  (fp_line
-		(start 1.27 3.81)
-		(end -1.27 3.81)
-		(stroke
-			(width 0.1)
-			(type solid)
-		)
-		(layer "F.Fab")
-	)
-  (fp_text user "${REFERENCE}"
-		(at 0 1.27 90)
-		(layer "F.Fab")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (pad "1" thru_hole rect
-		(at 0 0)
-		(size 1.7 1.7)
-		(drill 1)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
-	 (net "VCC"))
-  (pad "2" thru_hole circle
-		(at 0 2.54)
-		(size 1.7 1.7)
-		(drill 1)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
-	 (net "GND"))
-  (embedded_fonts no)
-  (model "${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x02_P2.54mm_Vertical.step"
-		(offset
-			(xyz 0 0 0)
-		)
-		(scale
-			(xyz 1 1 1)
-		)
-		(rotate
-			(xyz 0 0 0)
-		)
-	)
- )
- (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (layer "F.Cu") (at 60 30)
-  (descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
-  (tags "Through hole pin header THT 1x02 2.54mm single row")
-  (property "Reference" "J2"
 		(at 0 -2.38 0)
 		(layer "F.SilkS")
 		(effects
@@ -366,10 +185,11 @@
 		)
 	)
  )
- (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (layer "F.Cu") (at 90 30)
+ (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (layer "F.Cu") (at 60 30)
+  (path "/e3659efd-1945-8000-88d5-9607b575e907")
   (descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
   (tags "Through hole pin header THT 1x02 2.54mm single row")
-  (property "Reference" "J3"
+  (property "Reference" "J2"
 		(at 0 -2.38 0)
 		(layer "F.SilkS")
 		(effects
@@ -548,7 +368,8 @@
 		)
 	)
  )
- (footprint "Package_DIP:DIP-14_W7.62mm" (layer "F.Cu") (at 120 30)
+ (footprint "Package_DIP:DIP-14_W7.62mm" (layer "F.Cu") (at 90 30)
+  (path "/e3659efd-1945-8000-88d5-9507b575e754")
   (descr "14-lead though-hole mounted DIP package, row spacing 7.62mm (300 mils)")
   (tags "THT DIP DIL PDIP 2.54mm 7.62mm 300mil")
   (property "Reference" "U1"
@@ -821,154 +642,8 @@
 		)
 	)
  )
- (footprint "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm" (layer "F.Cu") (at 150 30)
-  (descr "C, Disc series, Radial, pin pitch=5.00mm, diameter*width=5*2.5mm^2, Capacitor, http://cdn-reichelt.de/documents/datenblatt/B300/DS_KERKO_TC.pdf")
-  (tags "C Disc series Radial pin pitch 5.00mm diameter 5mm width 2.5mm Capacitor")
-  (property "Reference" "C1"
-		(at 2.5 -2.5 0)
-		(layer "F.SilkS")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (property "Value" "100nF"
-		(at 2.5 2.5 0)
-		(layer "F.Fab")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (property "KiLib_Generator" "capacitor/THT/other"
-		(at 0 0 0)
-		(layer "F.SilkS")
-		(hide yes)
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (attr through_hole)
-  (duplicate_pad_numbers_are_jumpers no)
-  (fp_line
-		(start -0.12 -1.37)
-		(end 5.12 -1.37)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start -0.12 -1.033)
-		(end -0.12 -1.37)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start -0.12 1.37)
-		(end -0.12 1.033)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start 5.12 -1.37)
-		(end 5.12 -1.033)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start 5.12 1.033)
-		(end 5.12 1.37)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start 5.12 1.37)
-		(end -0.12 1.37)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_rect
-		(start -1.05 -1.5)
-		(end 6.05 1.5)
-		(stroke
-			(width 0.05)
-			(type solid)
-		)
-		(fill no)
-		(layer "F.CrtYd")
-	)
-  (fp_rect
-		(start 0 -1.25)
-		(end 5 1.25)
-		(stroke
-			(width 0.1)
-			(type solid)
-		)
-		(fill no)
-		(layer "F.Fab")
-	)
-  (fp_text user "${REFERENCE}"
-		(at 2.5 0 0)
-		(layer "F.Fab")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (pad "1" thru_hole circle
-		(at 0 0)
-		(size 1.6 1.6)
-		(drill 0.8)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
-	 (net "VCC"))
-  (pad "2" thru_hole circle
-		(at 5 0)
-		(size 1.6 1.6)
-		(drill 0.8)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
-	 (net "GND"))
-  (embedded_fonts no)
-  (model "${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D5.0mm_W2.5mm_P5.00mm.step"
-		(offset
-			(xyz 0 0 0)
-		)
-		(scale
-			(xyz 1 1 1)
-		)
-		(rotate
-			(xyz 0 0 0)
-		)
-	)
- )
- (footprint "Package_DIP:DIP-14_W7.62mm" (layer "F.Cu") (at 180 30)
+ (footprint "Package_DIP:DIP-14_W7.62mm" (layer "F.Cu") (at 120 30)
+  (path "/e3659efd-1945-8000-88d5-9407b575e5a1")
   (descr "14-lead though-hole mounted DIP package, row spacing 7.62mm (300 mils)")
   (tags "THT DIP DIL PDIP 2.54mm 7.62mm 300mil")
   (property "Reference" "U2"
@@ -1241,157 +916,11 @@
 		)
 	)
  )
- (footprint "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm" (layer "F.Cu") (at 30 60)
-  (descr "C, Disc series, Radial, pin pitch=5.00mm, diameter*width=5*2.5mm^2, Capacitor, http://cdn-reichelt.de/documents/datenblatt/B300/DS_KERKO_TC.pdf")
-  (tags "C Disc series Radial pin pitch 5.00mm diameter 5mm width 2.5mm Capacitor")
-  (property "Reference" "C2"
-		(at 2.5 -2.5 0)
-		(layer "F.SilkS")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (property "Value" "100nF"
-		(at 2.5 2.5 0)
-		(layer "F.Fab")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (property "KiLib_Generator" "capacitor/THT/other"
-		(at 0 0 0)
-		(layer "F.SilkS")
-		(hide yes)
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (attr through_hole)
-  (duplicate_pad_numbers_are_jumpers no)
-  (fp_line
-		(start -0.12 -1.37)
-		(end 5.12 -1.37)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start -0.12 -1.033)
-		(end -0.12 -1.37)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start -0.12 1.37)
-		(end -0.12 1.033)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start 5.12 -1.37)
-		(end 5.12 -1.033)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start 5.12 1.033)
-		(end 5.12 1.37)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_line
-		(start 5.12 1.37)
-		(end -0.12 1.37)
-		(stroke
-			(width 0.12)
-			(type solid)
-		)
-		(layer "F.SilkS")
-	)
-  (fp_rect
-		(start -1.05 -1.5)
-		(end 6.05 1.5)
-		(stroke
-			(width 0.05)
-			(type solid)
-		)
-		(fill no)
-		(layer "F.CrtYd")
-	)
-  (fp_rect
-		(start 0 -1.25)
-		(end 5 1.25)
-		(stroke
-			(width 0.1)
-			(type solid)
-		)
-		(fill no)
-		(layer "F.Fab")
-	)
-  (fp_text user "${REFERENCE}"
-		(at 2.5 0 0)
-		(layer "F.Fab")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-  (pad "1" thru_hole circle
-		(at 0 0)
-		(size 1.6 1.6)
-		(drill 0.8)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
-	 (net "VCC"))
-  (pad "2" thru_hole circle
-		(at 5 0)
-		(size 1.6 1.6)
-		(drill 0.8)
-		(layers "*.Cu" "*.Mask")
-		(remove_unused_layers no)
-	 (net "GND"))
-  (embedded_fonts no)
-  (model "${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D5.0mm_W2.5mm_P5.00mm.step"
-		(offset
-			(xyz 0 0 0)
-		)
-		(scale
-			(xyz 1 1 1)
-		)
-		(rotate
-			(xyz 0 0 0)
-		)
-	)
- )
- (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (layer "F.Cu") (at 60 60)
+ (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (layer "F.Cu") (at 150 30)
+  (path "/e3659efd-1945-8000-88d5-9307b575e3ee")
   (descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
   (tags "Through hole pin header THT 1x02 2.54mm single row")
-  (property "Reference" "J4"
+  (property "Reference" "J3"
 		(at 0 -2.38 0)
 		(layer "F.SilkS")
 		(effects
@@ -1570,10 +1099,11 @@
 		)
 	)
  )
- (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (layer "F.Cu") (at 90 60)
+ (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (layer "F.Cu") (at 180 30)
+  (path "/e3659efd-1945-8000-88d5-9207b575e23b")
   (descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
   (tags "Through hole pin header THT 1x02 2.54mm single row")
-  (property "Reference" "J5"
+  (property "Reference" "J4"
 		(at 0 -2.38 0)
 		(layer "F.SilkS")
 		(effects
@@ -1752,5 +1282,5 @@
 		)
 	)
  )
- (gr_rect (start 20 20) (end 200 105) (stroke (width 0.1) (type default)) (fill no) (layer "Edge.Cuts"))
+ (gr_rect (start 20 20) (end 200 75) (stroke (width 0.1) (type default)) (fill no) (layer "Edge.Cuts"))
 )

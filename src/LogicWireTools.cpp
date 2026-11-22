@@ -15,7 +15,7 @@ void LogicEditor::rerouteSelected() {
         if(canvas->selected.count(w.id)||canvas->selected.count(w.a.object)||canvas->selected.count(w.b.object))ids.insert(w.id);
     if(ids.empty())throw std::runtime_error("请先选择导线，或选择需要调整连线的元件");
     canvas->cancel();const auto before=history.project;
-    const auto result=rerouteWires(history.project,circuit(),ids);
+    const auto result=rerouteWires(history.project,circuit(),ids,true);
     history.commit(before);routingResult(result);
     if(result.failed.empty())routingNotice="已重排 "+std::to_string(ids.size())+" 条选中或关联导线";
     rebuild(false);
@@ -27,18 +27,10 @@ std::vector<std::string> LogicCanvas::wireCandidates(Point at) const {
     for(auto it=c.wires.rbegin();it!=c.wires.rend();++it) {
         const auto ps=wirePoints(p,c,*it);
         double closest=1e10;
-        for(size_t i=1;i<ps.size();++i) {
-            double d=segmentDistance(at,ps[i-1],ps[i]);
-            if(std::abs(ps[i].x-ps[i-1].x)<1e-6) {
-                auto found=crossingGaps.find(it->id);
-                if(found!=crossingGaps.end())for(auto gap:found->second)
-                    if(std::abs(gap.x-ps[i].x)<1e-6&&std::abs(at.y-gap.y)<FromDIP(4)/view.zoom) {
-                        const double r=FromDIP(4)/view.zoom;
-                        d=std::min(distance(at,gap+Point{0,-r}),distance(at,gap+Point{0,r}));
-                    }
-            }
-            closest=std::min(closest,d);
-        }
+        const auto found=crossingGaps.find(it->id);
+        static const std::vector<Point> noGaps;
+        for(const auto &stroke:visibleWireStrokes(ps,found==crossingGaps.end()?noGaps:found->second,FromDIP(4)/view.zoom))
+            closest=std::min(closest,segmentDistance(at,stroke.first,stroke.second));
         if(closest<FromDIP(7)/view.zoom)hits.push_back({it->id,closest});
     }
     std::stable_sort(hits.begin(),hits.end(),[](const auto &a,const auto &b){return a.second<b.second;});
@@ -131,22 +123,10 @@ void LogicCanvas::drawWire(wxGraphicsContext &g,const Wire &wire,bool clean) {
     updateWireDisplay();
     const auto ps=wirePoints(owner->history.project,owner->circuit(),wire);
     const auto found=crossingGaps.find(wire.id);
-    for(size_t i=1;i<ps.size();++i) {
-        const auto a=ps[i-1],b=ps[i];
-        std::vector<double> gaps;
-        if(found!=crossingGaps.end()&&std::abs(a.x-b.x)<1e-6)
-            for(auto point:found->second)if(std::abs(point.x-a.x)<1e-6&&point.y>std::min(a.y,b.y)+1e-6&&point.y<std::max(a.y,b.y)-1e-6)gaps.push_back(point.y);
-        if(gaps.empty()){g.StrokeLine(a.x,a.y,b.x,b.y);continue;}
-        std::sort(gaps.begin(),gaps.end());
-        double from=std::min(a.y,b.y),last=std::max(a.y,b.y);
-        const double gap=clean?4.0:FromDIP(4)/view.zoom;
-        for(auto y:gaps) {
-            const auto end=std::max(from,y-gap);
-            if(end>from)g.StrokeLine(a.x,from,a.x,end);
-            from=std::max(from,y+gap);
-        }
-        if(from<last)g.StrokeLine(a.x,from,a.x,last);
-    }
+    static const std::vector<Point> noGaps;
+    for(const auto &[a,b]:visibleWireStrokes(ps,found==crossingGaps.end()?noGaps:found->second,
+                                              clean?4.0:FromDIP(4)/view.zoom))
+        g.StrokeLine(a.x,a.y,b.x,b.y);
 }
 void LogicCanvas::drawWireHandles(wxGraphicsContext &g) {
     if(appearance||tool!="Select"||start||selected.size()!=1)return;

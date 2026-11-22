@@ -60,7 +60,7 @@ enum {
     L_GUIDE, L_UP, L_EDIT_DEFINITION, L_MEMORY_INITIAL, L_MEMORY_RUNTIME, L_PIN_LAYOUT,
     L_MONITOR, L_RECENT, L_TEMPLATE, L_BATCH_PNG, L_IMPORT_CIRC, L_IMPORT_MENU, L_EXPORT_MENU,
     L_ROTATE, L_TEXT_DEVICE, L_NEW_TABLE, L_IMPORT_TABLE, L_DIAGNOSTICS, L_REROUTE, L_EXPERIMENTS,
-    L_NETLIST_PCB,
+    L_NETLIST_PCB, L_WAVEFORM, L_CLOCK_SETTINGS, L_TIMING_SETTINGS, L_PLAYBACK_SETTINGS, L_WAVE_ADD_CONTEXT,
     L_RECENT_FIRST = wxID_HIGHEST + 900
 };
 enum PropertyRow { P_CIRCUIT, P_ROTATION, P_WIDTH, P_INPUTS, P_SELECT, P_INPUTWIDTH, P_OUTPUTWIDTH,
@@ -215,6 +215,9 @@ LogicEditor::LogicEditor(wxWindow *parent)
                   {L_RUN, "运行 / 暂停\tF5"},
                   {L_RUN_CYCLES, "运行指定节拍…"},
                   {L_RESET, "复位"},
+                  {L_WAVEFORM, "时序波形"},
+                  {L_TIMING_SETTINGS, "时序设置…"},
+                  {L_PLAYBACK_SETTINGS, "播放速度…"},
                   {L_TRACE, "事件追踪"}});
     bar->GetMenu(4)->Append(L_MEMORY_RUNTIME, U("查看实例运行内存…"));
     bar->GetMenu(4)->Append(L_MEMORY_INITIAL, U("编辑存储器初始内容…"));
@@ -414,6 +417,9 @@ LogicEditor::LogicEditor(wxWindow *parent)
         e.Skip();
     });
     propertySizer->Add(properties, 1, wxEXPAND);
+    clockSettingsButton = new wxButton(propertyPanel, L_CLOCK_SETTINGS, U("时钟设置…"));
+    clockSettingsButton->Hide();
+    propertySizer->Add(clockSettingsButton, 0, wxEXPAND | wxALL, FromDIP(4));
     propertyHint = new wxStaticText(propertyPanel, wxID_ANY, wxEmptyString);
     propertyHint->SetForegroundColour(wxColour("#c53242"));
     propertySizer->Add(propertyHint, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(4));
@@ -436,7 +442,20 @@ LogicEditor::LogicEditor(wxWindow *parent)
     canvasSizer->Add(navigationBar, 0, wxEXPAND | wxALL, FromDIP(5));
     canvas = new LogicCanvas(this, canvasColumn);
     canvas->SetName("logic-canvas");
-    canvasSizer->Add(canvas, 1, wxEXPAND);
+    auto workArea = new wxBoxSizer(wxHORIZONTAL);
+    workArea->Add(canvas, 1, wxEXPAND);
+    auto panel = createAssistant(canvasColumn);
+    workArea->Add(panel, 0, wxEXPAND);
+    panel->Hide();
+    auto toggleAssistant = new wxButton(canvasColumn, wxID_ANY, U("AI 助手"));
+    toggleAssistant->SetName("toggle-assistant");
+    navigationBar->AddStretchSpacer();
+    navigationBar->Add(toggleAssistant);
+    toggleAssistant->Bind(wxEVT_BUTTON, [panel,canvasColumn](wxCommandEvent &) {
+        panel->Show(!panel->IsShown());
+        canvasColumn->Layout();
+    });
+    canvasSizer->Add(workArea, 1, wxEXPAND);
     canvasColumn->SetSizer(canvasSizer);
     body->SetSashGravity(0);
     body->SplitVertically(left, canvasColumn, FromDIP(310));
@@ -486,6 +505,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
         stop();
         canvas->cancel();
         canvas->appearance = false;
+        resetWaveform(true);
         history.reset(Project{});
         current = "main";
         savedPath.clear();
@@ -505,6 +525,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
         stop();
         canvas->cancel();
         canvas->appearance = false;
+        resetWaveform(true);
         history.reset(halfAdder());
         current = "main";
         savedPath.clear();
@@ -617,34 +638,16 @@ LogicEditor::LogicEditor(wxWindow *parent)
     });
     bind(L_TICK, [this] {
         stop();
+        openWaveform(true);
         tick();
     });
-    bind(L_RUN, [this] {
-        if (timer.IsRunning())
-            stop();
-        else
-            timer.Start(500);
-        rebuild(false);
-    });
-    bind(L_RESET, [this] {
-        stop();
-        simulator->reset();
-        rebuild(false);
-    });
-    bind(L_RUN_CYCLES, [this] {
-        wxTextEntryDialog d(this, U("推进多少个基础节拍？（1–100000）\n各时钟根据自身高/低持续节拍与相位独立变化。"), U("运行指定节拍"), "10");
-        if (d.ShowModal() != wxID_OK)
-            return;
-        long n;
-        if (!d.GetValue().ToLong(&n) || n < 1 || n > 100000)
-            throw std::runtime_error("节拍数应为 1–100000");
-        stop();
-        if (simulator->pending())
-            simulator->settle();
-        for (long i = 0; i < n && !simulator->oscillating(); ++i)
-            simulator->tick();          // 全局基础节拍，不把多个独立时钟误称为同一周期。
-        rebuild(false);
-    });
+    bind(L_RUN, [this] { togglePlayback(); });
+    bind(L_RESET, [this] { resetSimulation(); });
+    bind(L_RUN_CYCLES, [this] { requestBatch(); });
+    bind(L_WAVEFORM, [this] { openWaveform(); });
+    bind(L_CLOCK_SETTINGS, [this] { clockSettings(); });
+    bind(L_TIMING_SETTINGS, [this] { timingSettings(); });
+    bind(L_PLAYBACK_SETTINGS, [this] { playbackSettings(); });
     bind(L_TRACE, [this] {
         std::ostringstream o;
         o << "时间\t实例路径\t引脚\t值\n";
@@ -713,7 +716,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
             "运行实例调试\n双击子电路查看该实例的真实信号，导航不暂停、不复位。\n"
             "使用顶部路径或“返回上级”导航；接口 Input 由父层驱动。\n"
             "实例内可操作按钮；改线或属性请点击“编辑定义（复位）”。\n"
-            "F5 运行/暂停；F7 单步传播；F8 时钟节拍。\n"
+            "F5 运行/暂停，F7 单步传播，F8 推进一个基础节拍。\n"
             "Ctrl+R 顺时针旋转；右键显示当前对象的快捷操作。");
     });
     bind(L_UP, [this] { if (!navigation.empty()) navigateTo(navigation.size() - 1); });
@@ -747,13 +750,14 @@ LogicEditor::LogicEditor(wxWindow *parent)
                 path=std::filesystem::path(__FILE__).parent_path().parent_path()/"examples"/"defense-hierarchy.logic.json";
             history.reset(deserialize(readFile(path)),false);
         } else history.reset(dialog.GetSelection()==1 ? halfAdder() : Project{}, dialog.GetSelection()!=1);
+        resetWaveform(true);
         current=history.project.main; savedPath.clear(); scope.clear(); navigation.clear();
         rebuild(true,true); canvas->fit();
     });
     bind(L_NEW_CIRCUIT, [this] { newCircuit(); });
     bind(L_DIAGNOSTICS, [this] { openDiagnostics(); });
     bind(L_REROUTE, [this] { rerouteSelected(); });
-    for (int command : {L_NEW_CIRCUIT, L_DEL_CIRCUIT})
+    for (int command : {L_NEW_CIRCUIT, L_DEL_CIRCUIT, L_CLOCK_SETTINGS})
         Bind(wxEVT_BUTTON, [this, command](wxCommandEvent &) {
             wxCommandEvent event(wxEVT_MENU, command);
             GetEventHandler()->ProcessEvent(event);
@@ -773,8 +777,8 @@ LogicEditor::LogicEditor(wxWindow *parent)
              "1. 选择左侧元件，在画布单击放置，或从库拖入。选择工具下拖动元件，导线跟随引脚。\n"
             "2. W 连线：点击引脚开始，空白处设置拐点，点击目标引脚结束。双击空白可结束到节点。\n"
             "3. 点击已有导线可创建分支；交叉不自动连接。J 创建节点；选中节点可设置网络标签。\n"
-            "4. 双击输入/按钮切换；多位值在左侧属性表格编辑。F7 推进一个事件时刻，F8 翻转时钟"
-             "（基础节拍），F5 运行/暂停；仿真菜单可一次推进指定数量的基础节拍。\n"
+             "4. 双击输入/按钮切换，多位值在左侧属性表格编辑。F7 推进传播，F8 推进一拍，F5 运行或暂停。\n"
+             "   选中 Clock 后点击“时钟设置…”调整频率。运行时序电路会自动打开波形，也可从仿真菜单打开。\n"
             "5. 项目菜单新建子电路，用输入/输出引脚定义接口；左侧子电路库放置实例，双击进入。\n"
             "   封装功能将当前电路的副本保存为子电路定义；每个实例的寄存器、RAM 状态独立。\n"
             "6. Ctrl+S 保存整个工程（包括全部子电路）；Ctrl+Z/Y 撤销重做；Ctrl+C/V 使用系统剪贴板。\n"
@@ -869,12 +873,12 @@ LogicEditor::LogicEditor(wxWindow *parent)
                       });
     Bind(wxEVT_TIMER, [this](wxTimerEvent &) {
         try {
-            tick();
+            simulationTimer();
         } catch (const std::exception &e) {
             stop();
             fail(e);
         }
-    });
+    }, timer.GetId());
     Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent &e) {
         canvas->cancel();
         if (e.CanVeto() && !discard()) {
@@ -896,6 +900,7 @@ void LogicEditor::fail(const std::exception &e) {
 }
 void LogicEditor::stop() {
     timer.Stop();
+    batchRemaining = batchTotal = 0;
 }
 void LogicEditor::populate() {
     tree->Freeze();
@@ -977,15 +982,18 @@ void LogicEditor::refreshHierarchy() {
     hierarchy->GetParent()->Layout();
 }
 void LogicEditor::rebuild(bool reset, bool lib) {
+    if (reset || lib) ++assistantRevision;
     canvas->wireDisplayDirty = true;
     canvas->previewDirty = true;
     if(!scope.empty() && !reset) { canvas->tool="Select"; canvas->appearance=false; }
     if (reset) {
         stop();
+        const bool rootChanged = simulationRoot != current;
         scope.clear(); navigation.clear(); simulationRoot=current;
         simulator = std::make_unique<Simulator>(history.project, current);
         if(traceFile) simulator->setTraceSink([this](const Trace &event) { writeTrace(event); });
         simulator->settle();
+        resetWaveform(rootChanged);
         hasTable = false;
     }
     if (lib) {
@@ -1029,6 +1037,7 @@ void LogicEditor::rebuild(bool reset, bool lib) {
               " | 拖动绘制；曲线松开后移动并单击确定弯曲；Shift 约束；Esc 取消；选择后拖动控制点"));
     inspect();
     canvas->Refresh();
+    refreshWaveform();
 }
 void LogicEditor::refreshDiagnostics() {
     std::optional<Issue> picked;
@@ -1082,7 +1091,9 @@ void LogicEditor::showDiagnostic(int index, bool locate) {
     diagnosticDetail->ChangeValue(U(diagnosticText(issue)));
     if (!locate)
         return;
-    auto id = issue.object;
+    locateObject(issue.object);
+}
+void LogicEditor::locateObject(std::string id) {
     // 诊断使用完整实例路径；逐层导航只改变观察上下文，不修改任何运行状态。
     if(id.find('/')!=std::string::npos) {
         if(!navigation.empty()) navigateTo(0);
@@ -1160,6 +1171,9 @@ void LogicEditor::inspect() {
     }
     inspectedSelection = canvas->selected;
     inspectedContext = context;
+    const auto *selectedPart = canvas->selected.size() == 1 ? circuit().part(*canvas->selected.begin()) : nullptr;
+    if (clockSettingsButton->Show(!templateMode && selectedPart && selectedPart->kind == "Clock" && scope.empty()))
+        clockSettingsButton->GetParent()->Layout();
     properties->BeginBatch();
     for (int row = 0; row < P_COUNT; ++row) {
         properties->SetCellValue(row, 1, "");
@@ -1311,7 +1325,9 @@ void LogicEditor::change(const std::function<void()> &action) {
     auto beforeHistory=history;
     auto oldCurrent = current;
     auto oldRoot=simulationRoot;
-    bool wasRunning=timer.IsRunning();stop();
+    bool wasRunning=timer.IsRunning();
+    const auto remaining = batchRemaining, total = batchTotal;
+    stop();
     auto previousSimulator=std::move(simulator);
     try {
         action();
@@ -1323,13 +1339,19 @@ void LogicEditor::change(const std::function<void()> &action) {
         candidate->settle();
         history.commit(before);
         simulator=std::move(candidate);simulationRoot=current;navigation.clear();scope.clear();hasTable=false;
+        resetWaveform(oldRoot != current);
         routingResult(routing);
         rebuild(false, true);
     } catch (...) {
         history=std::move(beforeHistory);
         current = oldCurrent;
         simulationRoot=oldRoot;simulator=std::move(previousSimulator);
-        rebuild(false, true);if(wasRunning)timer.Start(500);
+        if (wasRunning) {
+            batchRemaining = remaining;
+            batchTotal = total;
+            startPlayback();
+        }
+        rebuild(false, true);
         throw;
     }
 }
@@ -1506,6 +1528,7 @@ bool LogicEditor::load(const wxString &path) {
         stop();
         canvas->cancel();
         canvas->appearance = false;
+        resetWaveform(true);
         history.reset(loaded, !isCirc);
         current = loaded.main;
         savedPath = isCirc ? std::string{} : utf8(path);
@@ -1755,8 +1778,8 @@ void LogicEditor::exportKiCadPcb() {
     showReport("KiCad PCB 已导出",
                "请在 KiCad PCB 编辑器中打开：\n" + board.u8string() +
                "\n\n配套网表：\n" + netlist.u8string() + "\n引脚映射：\n" + mapping.u8string() +
-               "\n\n支持单比特二输入 AND/OR/NAND/XOR 及 NOT，包含电源、去耦和连接器。\n"
-               "同型号的门共用芯片，板文件使用 KiCad 10 标准封装。\n"
+               "\n\n支持单比特二输入 AND/OR/NAND/XOR 及 NOT，同型号的门共用芯片。\n"
+               "电源和地作为网络导出，顶层输入输出映射到信号连接器。\n"
                "板文件未布线，请继续布局、布线和设计规则检查。");
 }
 
@@ -1855,17 +1878,13 @@ void LogicEditor::renameCircuitTo(const std::string &name) {
     });
 }
 void LogicEditor::tick() {
-    if (simulator->pending())
-        simulator->settle();
-    simulator->tick();
-    auto found = simulator->issues();
-    for (auto &i : found)
-        if (i.message.find("事件预算") != std::string::npos)
-            stop();
+    advanceTick();
+    if (simulator->oscillating())
+        stop();
     rebuild(false);
 }
-void LogicEditor::showReport(const std::string &title, const std::string &content) {
-    wxDialog d(this, wxID_ANY, U(title), wxDefaultPosition, {950, 700},
+void LogicEditor::showReport(const std::string &title, const std::string &content, wxWindow *parent) {
+    wxDialog d(parent ? parent : this, wxID_ANY, U(title), wxDefaultPosition, {950, 700},
                wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     auto s = new wxBoxSizer(wxVERTICAL);
     auto t = new wxTextCtrl(&d, wxID_ANY, U(content), wxDefaultPosition, wxDefaultSize,
@@ -2047,7 +2066,14 @@ LogicCanvas::LogicCanvas(LogicEditor *editor, wxWindow *parent)
     Bind(wxEVT_RIGHT_DOWN, [this](wxMouseEvent &event) {
         cancel();
         tool = "Select";
-        auto id=hit(view.world({double(event.GetX()),double(event.GetY())}));
+        const auto at = view.world({double(event.GetX()),double(event.GetY())});
+        auto id=hit(at);
+        auto waveEndpoint = pinAt(at);
+        if (!waveEndpoint) {
+            const auto wires = wireCandidates(at);
+            if (!wires.empty())
+                waveEndpoint = Endpoint{wires.front(), ""};
+        }
         if(!id.empty()) selected={id};
         owner->inspect(); Refresh();
         wxMenu menu;
@@ -2065,9 +2091,16 @@ LogicCanvas::LogicCanvas(LogicEditor *editor, wxWindow *parent)
             add(L_MEMORY_RUNTIME,"查看运行内存"); if(owner->scope.empty()) add(L_MEMORY_INITIAL,"编辑初始内容");
         }
         if(part && (part->kind=="Keyboard"||part->kind=="TTY"||part->kind=="Joystick")) add(L_TEXT_DEVICE,"输入 / 查看内容");
+        if (part && part->kind == "Clock" && owner->scope.empty()) add(L_CLOCK_SETTINGS, "时钟设置…");
+        if (waveEndpoint && !appearance) add(L_WAVE_ADD_CONTEXT, "添加到时序波形");
         add(L_MONITOR,"监测信号 / CSV日志"); add(L_FIT,"适合画面");
-        menu.Bind(wxEVT_MENU,[this,id,enterCommand](wxCommandEvent &command) {
+        menu.Bind(wxEVT_MENU,[this,id,enterCommand,waveEndpoint](wxCommandEvent &command) {
             if(command.GetId()==enterCommand) { owner->enterInstance(id); return; }
+            if (command.GetId() == L_WAVE_ADD_CONTEXT && waveEndpoint) {
+                try { owner->addWaveformSignal(*waveEndpoint); }
+                catch (const std::exception &error) { owner->fail(error); }
+                return;
+            }
             wxCommandEvent forwarded(wxEVT_MENU,command.GetId()); owner->GetEventHandler()->ProcessEvent(forwarded);
         });
         PopupMenu(&menu);
@@ -2838,18 +2871,22 @@ std::pair<Point, Point> bounds(const Project &p, const Circuit &c, bool appearan
         return {lo, hi};
     }
     for (auto &q : c.parts) {
-        auto addLocal=[&](Point point) { for(int turn=0;turn<q.rotation;++turn)point={-point.y,point.x};add(q.at+point); };
-        if (q.kind == "Subcircuit")
-            for (const auto &s : p.circuit(q.circuit).shapes)
-                if (s.appearance) {
-                    auto b = shapeBounds(s);
-                    double margin = s.stroke / 2 + 6;
-                    addLocal(b.first - Point{std::max(105.0, margin), margin + 35});
-                    addLocal(b.second + Point{std::max(105.0, margin), margin + 40});
-                }
-        double h = partHeight(p, q);
-        double half = std::max(105.0, double(q.label.size()) * 7);
-        addLocal({-half,-h/2-35});addLocal({half,h/2+40});
+        const auto size = partSize(p, q);
+        const double halfLabel = std::max(105.0, double(q.label.size()) * 7);
+        if (q.kind == "Text") {
+            Point first{-halfLabel, -size.y / 2 - 35}, last{halfLabel, size.y / 2 + 40};
+            for (int turn = 0; turn < q.rotation; ++turn) {
+                first = {-first.y, first.x};
+                last = {-last.y, last.x};
+            }
+            add(q.at + first);
+            add(q.at + last);
+            continue;
+        }
+        const auto [bodyLo, bodyHi] = symbolBounds(p, q, size);
+        const double center = (bodyLo.x + bodyHi.x) / 2;
+        add({std::min(bodyLo.x - 20, center - halfLabel), bodyLo.y - 35});
+        add({std::max(bodyHi.x + 20, center + halfLabel), bodyHi.y + 40});
         for(const auto &pin:ports(p,q)) { add(q.at+pin.at-Point{20,20});add(q.at+pin.at+Point{20,20}); }
     }
     for (auto &n : c.nodes) {
@@ -3084,6 +3121,44 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder, bool experiments
     }
     if (serialize(symbols) != beforeSymbols)
         throw std::runtime_error("rendering changed the circuit model");
+    // 以主体上沿对齐，检查四个方向的标签具有相同的字形和位置。
+    for (const auto *kind : {"Power", "Not", "Output"}) {
+        Part p;
+        p.kind = kind;
+        if (p.kind == "Not") p.label = "反相器 INV1";
+        if (p.kind == "Output") {
+            p.width = 32;
+            p.label = "总线输出";
+        }
+        const auto size = partSize(symbols, p);
+        wxImage upright;
+        for (int rotation = 0; rotation < 4; ++rotation) {
+            p.rotation = rotation;
+            p.at = {};
+            const auto [lo, hi] = symbolBounds(symbols, p, size);
+            p.at = {120 - (lo.x + hi.x) / 2, 80 - lo.y};
+            wxBitmap bitmap(240, 220, 32);
+            {
+                wxMemoryDC dc(bitmap);
+                dc.SetBackground(*wxWHITE_BRUSH);
+                dc.Clear();
+                std::unique_ptr<wxGraphicsContext> g(wxGraphicsContext::Create(dc));
+                if (!g)
+                    throw std::runtime_error("symbol label graphics context failed");
+                drawSymbol(*g, symbols, p, [](const Port &pin) { return Signal::number(1, pin.width); });
+            }
+            const auto above = bitmap.ConvertToImage().GetSubImage({0, 0, 240, 72});
+            const auto *rgb = above.GetData();
+            const auto *end = rgb + 240 * 72 * 3;
+            if (rotation == 0) {
+                if (std::all_of(rgb, end, [](unsigned char value) { return value == 255; }))
+                    throw std::runtime_error("symbol label is missing above the body: " + p.kind);
+                upright = above;
+            } else if (!std::equal(rgb, end, upright.GetData())) {
+                throw std::runtime_error("symbol label changes with rotation: " + p.kind);
+            }
+        }
+    }
     // 无说明文字时，主体包围盒之外只允许边框连接圆点，不能残留外伸引线。
     for (auto p : specimens) {
         if (p.kind == "Text")
@@ -4085,7 +4160,10 @@ void LogicEditor::runSmoke(const std::filesystem::path &folder, bool experiments
         "外部电路 import, persistent diagnostics/navigation, unsaved state and native save/source "
         "preservation passed.\n");
     runExperimentSmoke(folder);
+    runAssistantSmoke(folder);
+    writeAtomic(folder/"ASSISTANT-PASS.txt","Provider and model selection, generated half-adder preview, apply/undo/redo, stale proposal and timeout checks passed with mock transport.\n");
     runModuleSmoke(folder);
+    runTimingSmoke(folder);
 }
 void LogicEditor::closeSmoke() {
     canvas->cancel();

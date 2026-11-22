@@ -548,7 +548,7 @@ std::vector<Issue> circDiagnostics(const Circuit &c) {
     std::vector<Issue> result;
     for (const auto &p : c.parts)
         if (p.kind == "Text" && p.label.rfind(notePrefix, 0) == 0)
-            result.push_back({"warning", p.id, p.label});
+            result.push_back({"warning", p.id, p.label, "IMPORT_NOTE"});
     return result;
 }
 
