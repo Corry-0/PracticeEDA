@@ -52,6 +52,8 @@ class LogicEditor : public wxFrame {
     wxStaticText *selection, *status, *diagnosticSummary;
     wxListBox *diagnostics;
     wxTimer timer;
+    wxTimer recoveryTimer;
+    bool recovering = false;
     std::vector<Issue> issues;
     Table lastTable;
     bool hasTable = false;
@@ -100,6 +102,9 @@ class LogicEditor : public wxFrame {
     void writeTrace(const Trace &event);
     void rememberFile(const std::string &path);
     void recentMenu();
+    void writeRecovery();
+    void clearRecovery();
+    void checkRecovery();
     void exportBatch();
     void printCircuit(bool preview);
     void textDevice();

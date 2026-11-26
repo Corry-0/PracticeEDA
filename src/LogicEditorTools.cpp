@@ -1,6 +1,7 @@
 // 编辑器的辅助窗口。初值属于工程定义，运行值属于展开实例，两者绝不混写。
 #include "DigitalEditor.h"
 #include <wx/config.h>
+#include <wx/stdpaths.h>
 #include <wx/filedlg.h>
 #include <wx/dirdlg.h>
 #include <wx/choicdlg.h>
@@ -200,6 +201,70 @@ void LogicEditor::monitorSignals() {
     for(auto index:select.GetSelections()) monitoredSignals.insert(keys[size_t(index)]);
     simulator->setTraceSink([this](const Trace &event) { writeTrace(event); });
     wxMessageBox(U("日志已开始。信号每次变化都会立即写入 CSV；再次打开此菜单可停止。"),U("信号监测"),wxOK|wxICON_INFORMATION,this);
+}
+
+void LogicEditor::writeRecovery() {
+    if (recovering || !history.dirty())
+        return;
+    try {
+        history.project.validate();
+        auto folder = fsPath(wxStandardPaths::Get().GetUserLocalDataDir());
+        std::filesystem::create_directories(folder);
+        writeAtomic(folder / "recovery.logic.json", serialize(history.project));
+        wxConfig config("PracticeEDA");
+        config.Write("recovery/path", U(savedPath));
+        config.Write("recovery/time", wxDateTime::Now().FormatISOCombined(' '));
+        config.Flush();
+    } catch (...) {
+        // 恢复副本不能打断正常编辑；下次定时器触发时会再次尝试。
+    }
+}
+
+void LogicEditor::clearRecovery() {
+    std::error_code ec;
+    std::filesystem::remove(fsPath(wxStandardPaths::Get().GetUserLocalDataDir()) / "recovery.logic.json", ec);
+    wxConfig config("PracticeEDA");
+    config.DeleteGroup("recovery");
+    config.Flush();
+}
+
+void LogicEditor::checkRecovery() {
+    auto path = fsPath(wxStandardPaths::Get().GetUserLocalDataDir()) / "recovery.logic.json";
+    if (!std::filesystem::exists(path))
+        return;
+    try {
+        wxConfig config("PracticeEDA");
+        wxString original, when;
+        config.Read("recovery/path", &original);
+        config.Read("recovery/time", &when);
+        std::string detail = when.empty() ? "上次编辑留下了一个未完成的恢复副本。" :
+            "上次编辑留下了恢复副本（" + utf8(when) + "）。";
+        if (!original.empty())
+            detail += "\n原工程：" + utf8(original);
+        detail += "\n是否恢复？";
+        int answer = wxMessageBox(U(detail), U("恢复未保存的工程"), wxYES_NO | wxICON_QUESTION, this);
+        if (answer != wxYES) {
+            clearRecovery();
+            return;
+        }
+        recovering = true;
+        auto recovered = deserialize(readFile(path));
+        history.reset(recovered, false);
+        current = recovered.main;
+        savedPath = utf8(original);
+        scope.clear();
+        navigation.clear();
+        canvas->selected.clear();
+        rebuild(true, true);
+        canvas->fit();
+        recovering = false;
+        wxMessageBox(U("已恢复未保存的工程；请使用“保存”确认写入原工程文件。"), U("恢复完成"),
+                     wxOK | wxICON_INFORMATION, this);
+    } catch (const std::exception &e) {
+        recovering = false;
+        clearRecovery();
+        fail(e);
+    }
 }
 
 void LogicEditor::rememberFile(const std::string &path) {
