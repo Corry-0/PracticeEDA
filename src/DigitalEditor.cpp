@@ -133,7 +133,8 @@ const wxString openFilter = U("可打开的工程 (*.logic.json;*.circ)|*.logic.
 const wxString filter = U("数字逻辑工程 (*.logic.json)|*.logic.json|JSON 文件 (*.json)|*.json");
 } // namespace
 LogicEditor::LogicEditor(wxWindow *parent)
-    : wxFrame(parent, wxID_ANY, U("PracticeEDA · 数字逻辑"), wxDefaultPosition, {1500, 940}), timer(this) {
+    : wxFrame(parent, wxID_ANY, U("PracticeEDA · 数字逻辑"), wxDefaultPosition, {1500, 940}), timer(this),
+      recoveryTimer(this) {
     SetMinSize({1120, 720});
     SetIcon(icon("And").GetIcon({32, 32}));
     history.reset(Project{});
@@ -879,6 +880,7 @@ LogicEditor::LogicEditor(wxWindow *parent)
             fail(e);
         }
     }, timer.GetId());
+    Bind(wxEVT_TIMER, [this](wxTimerEvent &) { writeRecovery(); }, recoveryTimer.GetId());
     Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent &e) {
         canvas->cancel();
         if (e.CanVeto() && !discard()) {
@@ -886,6 +888,8 @@ LogicEditor::LogicEditor(wxWindow *parent)
             return;
         }
         stop();
+        recoveryTimer.Stop();
+        clearRecovery();
         simulator->setTraceSink({}); traceFile.reset();
         e.Skip();
     });
@@ -893,6 +897,8 @@ LogicEditor::LogicEditor(wxWindow *parent)
     auto &config = *wxConfigBase::Get();
     for(int i=0;i<8;++i) { wxString path; if(config.Read("recent/"+std::to_string(i),&path) && !path.empty())
         recentFiles.push_back(utf8(path)); }
+    recoveryTimer.Start(30000);
+    checkRecovery();
     Centre();
 }
 void LogicEditor::fail(const std::exception &e) {
@@ -1511,6 +1517,7 @@ bool LogicEditor::save(bool as) {
         savedPath = utf8(path);
         rememberFile(savedPath);
         history.markSaved();
+        clearRecovery();
         rebuild(false);
         return true;
     } catch (const std::exception &e) {
@@ -4171,3 +4178,4 @@ void LogicEditor::closeSmoke() {
     Close();
 }
 } // namespace eda::logic
+

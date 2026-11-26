@@ -61,6 +61,8 @@ class LogicEditor : public wxFrame {
     wxStaticText *selection, *status, *diagnosticSummary;
     wxListBox *diagnostics;
     wxTimer timer;
+    wxTimer recoveryTimer;
+    bool recovering = false;
     WaveformWindow *waveform = nullptr;
     unsigned playbackRate = 2;
     long batchRemaining = 0, batchTotal = 0;
@@ -131,6 +133,9 @@ class LogicEditor : public wxFrame {
     void writeTrace(const Trace &event);
     void rememberFile(const std::string &path);
     void recentMenu();
+    void writeRecovery();
+    void clearRecovery();
+    void checkRecovery();
     void exportBatch();
     void textDevice();
     void showExperimentCases();
@@ -220,3 +225,4 @@ class LogicCanvas : public wxPanel {
     friend class LogicEditor;
 };
 } // namespace eda::logic
+

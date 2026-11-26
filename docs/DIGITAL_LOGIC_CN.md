@@ -139,7 +139,7 @@ CSV 表头以 `IN:`/`OUT:` 区分输入输出，例如 `"IN:A","IN:B","OUT:Y"`�
 - 真值表限组合电路，输入总位数≤10、输出总位数≤128，至少一个 Output。遇到时序元件、反馈不收敛或未知输出会明确拒绝；不把它们伪装成确定结果。分析不会修改当前仿真状态。
 - 标准与或式与化简式均可查看。独立表达式支持英文/下划线变量名、0/1、!/~、&/*、^、|/+、括号，优先级为非、与、异或、或。随机数使用可重复的 xorshift32 种子，服务教学验证，不用于密码学。
 - 保存使用自有 `.logic.json`；可[交换经典 Logisim `.circ`](CIRC_IMPORT_CN.md)，不支持 JAR 扩展库、evolution 工程或专业 HDL 仿真。旧 `.eda.json` 不属于数字工程格式，打开时提示不支持。
-- 数字工程需显式保存；尚未提供自动恢复和运行状态断点持久化。
+- 数字工程仍使用显式保存；编辑期间每 30 秒会在用户本地数据目录写入恢复副本。程序下次启动时会询问是否恢复，正常保存或关闭后自动清理副本。恢复副本只包含工程定义，不包含仿真器当前的运行时间、寄存器或 RAM 运行态。
 
 ## 源码与验证
 
@@ -158,3 +158,4 @@ CSV 表头以 `IN:`/`OUT:` 区分输入输出，例如 `"IN:A","IN:B","OUT:Y"`�
 执行 `scripts/build.ps1 -Configuration Debug -GuiTest` 或 `scripts/build.ps1 -Configuration Release -GuiTest -Package`，构建、运行数字测试和 GUI 检查。分别输出 `build/qa-debug/`、`build/qa-release/`，成功标志为 `LOGIC-PASS.txt`。检查启动、全部图标映射、快捷栏、拖动、连接、撤销、剪贴板、保存加载、仿真与导出。
 
 GUI 检查还导出 `logic-symbols.png`（全部元件与子电路）、`logic-symbol-previews.png`（放置预览）、`logic-symbol-states.png`（选中、未知、高阻、错误状态）和 `logic-inverter.png`（输入—非门—输出）。检查所有端口被绘制、绘图不修改电路数据，以及连接命中位置与原有模型一致。
+

@@ -4,7 +4,7 @@ C++17 / wxWidgets 桌面数字电路编辑器，当前版本 0.5，提供七类�
 
 个人发布仓库：[Corry-0/PracticeEDA](https://github.com/Corry-0/PracticeEDA)。
 
-支持画布拖拽、60 种元件/注释、元件旋转、参数化逻辑门与选择器、1–32 位总线和任意位分组、独立时钟、可配置 RAM/ROM、子电路实例实时调试、自定义元件及跨工程复用、组合逻辑化简与自动生成电路、网表导出、`.circ` 导入、项目保存加载、PNG 导出、撤销重做、剪贴板与错误定位。
+支持画布拖拽、60 种元件/注释、元件旋转、参数化逻辑门与选择器、1–32 位总线和任意位分组、独立时钟、可配置 RAM/ROM、子电路实例实时调试、自定义元件及跨工程复用、组合逻辑化简与自动生成电路、网表导出与 `.circ` 导入、项目保存加载、自动保存与崩溃恢复、PNG/打印、撤销重做、剪贴板与错误定位。
 
 工具栏、分类树和常用元件栏已加入图标，复用了 `wxWidgets/samples` 中的资源，并补充数字逻辑符号。所有图标内嵌程序，支持高 DPI 缩放。
 
@@ -133,3 +133,4 @@ ctest --test-dir build-core -C Debug --output-on-failure
 本仓库保留 [LEVE1012/ElectronicComponent_Practice-](https://github.com/LEVE1012/ElectronicComponent_Practice-) 的原型提交历史，在此基础上整理和扩展为当前 PracticeEDA。历史提交作者与第三方资源署名保持原样；第三方许可文本见 `third_party/`，图标来源见 [资源说明](resources/ICONS.md)。
 
 当前以数字逻辑为主，PCB 仅提供上述受限实体映射，板未布线；不含模拟电路求解和制造验收。分发包静态链接 wxWidgets，Windows 目标机器仍需 Microsoft Visual C++ x64 运行库。
+
