@@ -1,0 +1,315 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            100.0,
+            100.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "D",
+          "kind": "Input",
+          "label": "D",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            100.0,
+            350.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "CLK",
+          "kind": "Clock",
+          "label": "CLK",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            100.0,
+            510.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "CLR",
+          "kind": "Input",
+          "label": "CLR",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            370.0,
+            100.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "R1",
+          "kind": "Register",
+          "label": "R1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            650.0,
+            100.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "R2",
+          "kind": "Register",
+          "label": "R2",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            370.0,
+            230.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "Q1",
+          "kind": "Output",
+          "label": "Q1",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            890.0,
+            100.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "Q2",
+          "kind": "Output",
+          "label": "Q2",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "D",
+            "Y"
+          ],
+          "b": [
+            "R1",
+            "D"
+          ],
+          "bends": [
+            [
+              130.0,
+              100.0
+            ],
+            [
+              130.0,
+              90.0
+            ]
+          ],
+          "id": "w1"
+        },
+        {
+          "a": [
+            "R1",
+            "Q"
+          ],
+          "b": [
+            "R2",
+            "D"
+          ],
+          "bends": [
+            [
+              440.0,
+              110.0
+            ],
+            [
+              440.0,
+              90.0
+            ]
+          ],
+          "id": "w2"
+        },
+        {
+          "a": [
+            "R1",
+            "Q"
+          ],
+          "b": [
+            "Q1",
+            "A"
+          ],
+          "bends": [
+            [
+              440.0,
+              110.0
+            ],
+            [
+              440.0,
+              206.0
+            ],
+            [
+              340.0,
+              206.0
+            ],
+            [
+              340.0,
+              230.0
+            ]
+          ],
+          "id": "w3"
+        },
+        {
+          "a": [
+            "R2",
+            "Q"
+          ],
+          "b": [
+            "Q2",
+            "A"
+          ],
+          "bends": [
+            [
+              720.0,
+              110.0
+            ],
+            [
+              720.0,
+              100.0
+            ]
+          ],
+          "id": "w4"
+        },
+        {
+          "a": [
+            "CLK",
+            "Y"
+          ],
+          "b": [
+            "R1",
+            "CLK"
+          ],
+          "bends": [
+            [
+              140.0,
+              350.0
+            ],
+            [
+              140.0,
+              110.0
+            ]
+          ],
+          "id": "w5"
+        },
+        {
+          "a": [
+            "CLR",
+            "Y"
+          ],
+          "b": [
+            "R1",
+            "CLR"
+          ],
+          "bends": [
+            [
+              300.0,
+              510.0
+            ],
+            [
+              300.0,
+              130.0
+            ]
+          ],
+          "id": "w6"
+        },
+        {
+          "a": [
+            "CLK",
+            "Y"
+          ],
+          "b": [
+            "R2",
+            "CLK"
+          ],
+          "bends": [
+            [
+              140.0,
+              350.0
+            ],
+            [
+              140.0,
+              254.0
+            ],
+            [
+              580.0,
+              254.0
+            ],
+            [
+              580.0,
+              110.0
+            ]
+          ],
+          "id": "w7"
+        },
+        {
+          "a": [
+            "CLR",
+            "Y"
+          ],
+          "b": [
+            "R2",
+            "CLR"
+          ],
+          "bends": [
+            [
+              570.0,
+              510.0
+            ],
+            [
+              570.0,
+              130.0
+            ]
+          ],
+          "id": "w8"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "时序演示 03：同沿两级寄存器流水",
+  "nextId": 9,
+  "version": 1
+}

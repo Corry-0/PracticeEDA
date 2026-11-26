@@ -4,6 +4,9 @@
 
 namespace eda::logic {
 wxColour signalColour(const Signal &);
+std::pair<Point, Point> symbolBounds(const Project &, const Part &, Point size);
+inline constexpr double symbolLabelGap = 8;
+inline constexpr double symbolValueGap = 12;
 void drawShape(wxGraphicsContext &, const Shape &, bool selected = false, bool preview = false,
                double zoom = 1);
 // 画布、放置预览与导出共用同一渲染器。外部引脚位置完全来自 ports()，

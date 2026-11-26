@@ -4,24 +4,6 @@
       "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
       "pads": [
         {
-          "name": "VCC",
-          "net": 1,
-          "pad": 1
-        },
-        {
-          "name": "GND",
-          "net": 2,
-          "pad": 2
-        }
-      ],
-      "path": "power",
-      "ref": "J1",
-      "value": "POWER_5V"
-    },
-    {
-      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
-      "pads": [
-        {
           "name": "N1",
           "net": 3,
           "pad": 1
@@ -33,7 +15,7 @@
         }
       ],
       "path": "p1",
-      "ref": "J2",
+      "ref": "J1",
       "value": "A"
     },
     {
@@ -51,7 +33,7 @@
         }
       ],
       "path": "p2",
-      "ref": "J3",
+      "ref": "J2",
       "value": "B"
     },
     {
@@ -115,25 +97,19 @@
       ],
       "path": "p3",
       "ref": "U1",
-      "value": "74HC86"
-    },
-    {
-      "footprint": "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm",
-      "pads": [
+      "symbol": "74xx:74HC86",
+      "units": [
         {
-          "name": "VCC",
-          "net": 1,
-          "pad": 1
-        },
-        {
-          "name": "GND",
-          "net": 2,
-          "pad": 2
+          "path": "p3",
+          "pins": {
+            "A": 1,
+            "B": 2,
+            "Y": 3
+          },
+          "unit": "A"
         }
       ],
-      "path": "p3/decoupling",
-      "ref": "C1",
-      "value": "100nF"
+      "value": "74HC86"
     },
     {
       "footprint": "Package_DIP:DIP-14_W7.62mm",
@@ -196,25 +172,19 @@
       ],
       "path": "p4",
       "ref": "U2",
-      "value": "74HC08"
-    },
-    {
-      "footprint": "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm",
-      "pads": [
+      "symbol": "74xx:74LS08",
+      "units": [
         {
-          "name": "VCC",
-          "net": 1,
-          "pad": 1
-        },
-        {
-          "name": "GND",
-          "net": 2,
-          "pad": 2
+          "path": "p4",
+          "pins": {
+            "A": 1,
+            "B": 2,
+            "Y": 3
+          },
+          "unit": "A"
         }
       ],
-      "path": "p4/decoupling",
-      "ref": "C2",
-      "value": "100nF"
+      "value": "74HC08"
     },
     {
       "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
@@ -231,7 +201,7 @@
         }
       ],
       "path": "p5",
-      "ref": "J4",
+      "ref": "J3",
       "value": "Sum"
     },
     {
@@ -249,7 +219,7 @@
         }
       ],
       "path": "p6",
-      "ref": "J5",
+      "ref": "J4",
       "value": "Carry"
     }
   ],
@@ -259,24 +229,12 @@
       "id": 1,
       "members": [
         {
-          "pad": 1,
-          "ref": "J1"
-        },
-        {
           "pad": 14,
           "ref": "U1"
         },
         {
-          "pad": 1,
-          "ref": "C1"
-        },
-        {
           "pad": 14,
           "ref": "U2"
-        },
-        {
-          "pad": 1,
-          "ref": "C2"
         }
       ],
       "name": "VCC"
@@ -293,80 +251,68 @@
           "ref": "J2"
         },
         {
+          "pad": 4,
+          "ref": "U1"
+        },
+        {
+          "pad": 5,
+          "ref": "U1"
+        },
+        {
+          "pad": 7,
+          "ref": "U1"
+        },
+        {
+          "pad": 9,
+          "ref": "U1"
+        },
+        {
+          "pad": 10,
+          "ref": "U1"
+        },
+        {
+          "pad": 12,
+          "ref": "U1"
+        },
+        {
+          "pad": 13,
+          "ref": "U1"
+        },
+        {
+          "pad": 4,
+          "ref": "U2"
+        },
+        {
+          "pad": 5,
+          "ref": "U2"
+        },
+        {
+          "pad": 7,
+          "ref": "U2"
+        },
+        {
+          "pad": 9,
+          "ref": "U2"
+        },
+        {
+          "pad": 10,
+          "ref": "U2"
+        },
+        {
+          "pad": 12,
+          "ref": "U2"
+        },
+        {
+          "pad": 13,
+          "ref": "U2"
+        },
+        {
           "pad": 2,
           "ref": "J3"
         },
         {
-          "pad": 4,
-          "ref": "U1"
-        },
-        {
-          "pad": 5,
-          "ref": "U1"
-        },
-        {
-          "pad": 7,
-          "ref": "U1"
-        },
-        {
-          "pad": 9,
-          "ref": "U1"
-        },
-        {
-          "pad": 10,
-          "ref": "U1"
-        },
-        {
-          "pad": 12,
-          "ref": "U1"
-        },
-        {
-          "pad": 13,
-          "ref": "U1"
-        },
-        {
-          "pad": 2,
-          "ref": "C1"
-        },
-        {
-          "pad": 4,
-          "ref": "U2"
-        },
-        {
-          "pad": 5,
-          "ref": "U2"
-        },
-        {
-          "pad": 7,
-          "ref": "U2"
-        },
-        {
-          "pad": 9,
-          "ref": "U2"
-        },
-        {
-          "pad": 10,
-          "ref": "U2"
-        },
-        {
-          "pad": 12,
-          "ref": "U2"
-        },
-        {
-          "pad": 13,
-          "ref": "U2"
-        },
-        {
-          "pad": 2,
-          "ref": "C2"
-        },
-        {
           "pad": 2,
           "ref": "J4"
-        },
-        {
-          "pad": 2,
-          "ref": "J5"
         }
       ],
       "name": "GND"
@@ -376,7 +322,7 @@
       "members": [
         {
           "pad": 1,
-          "ref": "J2"
+          "ref": "J1"
         },
         {
           "pad": 1,
@@ -394,7 +340,7 @@
       "members": [
         {
           "pad": 1,
-          "ref": "J3"
+          "ref": "J2"
         },
         {
           "pad": 2,
@@ -416,7 +362,7 @@
         },
         {
           "pad": 1,
-          "ref": "J4"
+          "ref": "J3"
         }
       ],
       "name": "N3"
@@ -430,7 +376,7 @@
         },
         {
           "pad": 1,
-          "ref": "J5"
+          "ref": "J4"
         }
       ],
       "name": "N4"

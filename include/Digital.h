@@ -59,10 +59,21 @@ struct Circuit {
     Part *part(const std::string &id);
     const Part *part(const std::string &id) const;
 };
+inline constexpr uint32_t defaultTickDurationNs = 500000;
+inline constexpr int64_t maxClockLevelTicks = 1000000;
+struct ClockTiming {
+    int64_t highTicks = 1, lowTicks = 1;
+    double frequencyHz(uint32_t tickDurationNs) const;
+    double dutyPercent() const;
+};
+ClockTiming clockTiming(const Part &);
+ClockTiming quantizeClock(double frequencyHz, double dutyPercent, uint32_t tickDurationNs);
+
 struct Project {
     std::string name = "数字逻辑工程", main = "main";
     uint64_t nextId = 1;
     std::vector<Circuit> circuits{Circuit{}};
+    uint32_t tickDurationNs = defaultTickDurationNs;
     std::string id(const std::string &prefix);
     Circuit &circuit(const std::string &name);
     const Circuit &circuit(const std::string &name) const;
@@ -146,6 +157,11 @@ class Simulator {
     std::string text(const std::string &path) const;
     // 事件接收器可持续写文件；不受窗口内最近 2000 条显示缓存的限制。
     void setTraceSink(std::function<void(const Trace &)> sink);
+    // Network IDs are valid for this compiled simulator. Values come from resolved nets.
+    using NetworkSink = std::function<void(int, uint64_t, uint64_t, const Signal &)>;
+    std::optional<int> network(const Endpoint &) const;
+    void setNetworkSink(NetworkSink sink);
+    bool hasTimingDevices() const;
     std::vector<Issue> issues() const;
     const std::vector<Trace> &trace() const;
     uint64_t time() const;

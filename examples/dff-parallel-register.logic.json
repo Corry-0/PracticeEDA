@@ -1,0 +1,57 @@
+{
+  "format": "PracticeEDA.logic", "version": 1,
+  "name": "实验案例：4 位并联寄存器", "main": "main", "nextId": 100,
+  "circuits": [{
+    "name": "main",
+    "parts": [
+      {"id":"data","kind":"Input","label":"D[3:0]","circuit":"","at":[105,375],"width":4,"value":10,"data":[]},
+      {"id":"split","kind":"Splitter","label":"拆分输入","circuit":"","at":[240,365],"width":4,"value":0,"data":[]},
+      {"id":"clk","kind":"Clock","label":"CLK","circuit":"","at":[105,680],"width":1,"value":0,"data":[]},
+      {"id":"clr","kind":"Input","label":"CLR","circuit":"","at":[105,776],"width":1,"value":0,"data":[]},
+      {"id":"join","kind":"Joiner","label":"合并输出","circuit":"","at":[900,375],"width":4,"value":0,"data":[]},
+      {"id":"result","kind":"Output","label":"Q[3:0]","circuit":"","at":[1060,385],"width":4,"value":0,"data":[]},
+      {"id":"ff0","kind":"DFF","label":"DFF0","circuit":"","at":[540,130],"width":1,"value":0,"data":[]},
+      {"id":"ff1","kind":"DFF","label":"DFF1","circuit":"","at":[540,284],"width":1,"value":0,"data":[]},
+      {"id":"ff2","kind":"DFF","label":"DFF2","circuit":"","at":[540,438],"width":1,"value":0,"data":[]},
+      {"id":"ff3","kind":"DFF","label":"DFF3","circuit":"","at":[540,592],"width":1,"value":0,"data":[]}
+    ],
+    "nodes": [
+      {"id":"clock0","label":"","at":[420,140]},
+      {"id":"clear0","label":"","at":[450,160]},
+      {"id":"clock1","label":"","at":[420,294]},
+      {"id":"clear1","label":"","at":[450,314]},
+      {"id":"clock2","label":"","at":[420,448]},
+      {"id":"clear2","label":"","at":[450,468]},
+      {"id":"clock3","label":"","at":[420,602]},
+      {"id":"clear3","label":"","at":[450,622]}
+    ],
+    "wires": [
+      {"id":"w1","a":["data","Y"],"b":["split","A"],"bends":[]},
+      {"id":"w2","a":["join","Y"],"b":["result","A"],"bends":[]},
+      {"id":"w3","a":["split","B0"],"b":["ff0","D"],"bends":[[320,345],[320,120]]},
+      {"id":"w4","a":["ff0","Q"],"b":["join","B0"],"bends":[[780,140],[780,355]]},
+      {"id":"w5","a":["clock0",""],"b":["ff0","CLK"],"bends":[]},
+      {"id":"w6","a":["clear0",""],"b":["ff0","CLR"],"bends":[]},
+      {"id":"w7","a":["split","B1"],"b":["ff1","D"],"bends":[[365,365],[365,274]]},
+      {"id":"w8","a":["ff1","Q"],"b":["join","B1"],"bends":[[730,294],[730,375]]},
+      {"id":"w9","a":["clock1",""],"b":["ff1","CLK"],"bends":[]},
+      {"id":"w10","a":["clear1",""],"b":["ff1","CLR"],"bends":[]},
+      {"id":"w11","a":["clock0",""],"b":["clock1",""],"bends":[]},
+      {"id":"w12","a":["clear0",""],"b":["clear1",""],"bends":[]},
+      {"id":"w13","a":["split","B2"],"b":["ff2","D"],"bends":[[365,385],[365,428]]},
+      {"id":"w14","a":["ff2","Q"],"b":["join","B2"],"bends":[[730,448],[730,395]]},
+      {"id":"w15","a":["clock2",""],"b":["ff2","CLK"],"bends":[]},
+      {"id":"w16","a":["clear2",""],"b":["ff2","CLR"],"bends":[]},
+      {"id":"w17","a":["clock1",""],"b":["clock2",""],"bends":[]},
+      {"id":"w18","a":["clear1",""],"b":["clear2",""],"bends":[]},
+      {"id":"w19","a":["split","B3"],"b":["ff3","D"],"bends":[[320,405],[320,582]]},
+      {"id":"w20","a":["ff3","Q"],"b":["join","B3"],"bends":[[780,602],[780,415]]},
+      {"id":"w21","a":["clock3",""],"b":["ff3","CLK"],"bends":[]},
+      {"id":"w22","a":["clear3",""],"b":["ff3","CLR"],"bends":[]},
+      {"id":"w23","a":["clock2",""],"b":["clock3",""],"bends":[]},
+      {"id":"w24","a":["clear2",""],"b":["clear3",""],"bends":[]},
+      {"id":"w25","a":["clk","Y"],"b":["clock3",""],"bends":[[420,680]]},
+      {"id":"w26","a":["clr","Y"],"b":["clear3",""],"bends":[[450,776]]}
+    ]
+  }]
+}

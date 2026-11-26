@@ -1,6 +1,6 @@
 // 外部电路(Logisim) 2.7 的转换边界。源几何坐标只在这里使用；保存后的模型
 // 仍然连接显式端点。内置 TinyXML2 使核心测试可以脱离 GUI 运行。
-#include "CircExchange.h"
+#include "Digital.h"
 #include "tinyxml2.h"
 #include <cctype>
 #include <cmath>
@@ -544,23 +544,11 @@ void note(Project &p, Circuit &c, Point at, const std::string &message) {
 }
 } // namespace
 
-detail::CircDevice detail::circDevice(const std::string &name, const std::string &library,
-                                     const std::map<std::string, std::string> &attributes) {
-    Source source;
-    source.name = name; source.lib = library; source.at = {0, 0}; source.a = attributes;
-    mapPart(source);
-    CircDevice result; result.part = source.part;
-    for (const auto &pin : source.pins)
-        result.pins.push_back({{double(pin.first.first), double(pin.first.second)}, pin.second});
-    for (auto pin : source.unused) result.unsupportedPins.push_back({double(pin.first), double(pin.second)});
-    return result;
-}
-
 std::vector<Issue> circDiagnostics(const Circuit &c) {
     std::vector<Issue> result;
     for (const auto &p : c.parts)
         if (p.kind == "Text" && p.label.rfind(notePrefix, 0) == 0)
-            result.push_back({"warning", p.id, p.label});
+            result.push_back({"warning", p.id, p.label, "IMPORT_NOTE"});
     return result;
 }
 

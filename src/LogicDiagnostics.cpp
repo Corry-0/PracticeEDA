@@ -1,5 +1,6 @@
 // ERC 的画布提示和按需问题窗口。此文件只呈现现有规则，不修改仿真或电气拓扑。
 #include "DigitalEditor.h"
+#include "LogicSymbols.h"
 #include <wx/dcclient.h>
 #include <wx/tooltip.h>
 
@@ -119,7 +120,7 @@ std::vector<LogicCanvas::DiagnosticMarker> LogicCanvas::diagnosticMarkers() cons
                       int(std::ceil(hi.y - lo.y)) + 2 * margin + 1);
         if (bounds.Intersects(client)) obstacles.push_back(bounds);
     };
-    // 把文字和实时值也纳入保护区；旋转后再投影，避免警示图标挡住名称或端子。
+    // 元件标签和实时值在画布坐标中的位置也需要避让。
     wxClientDC metrics(const_cast<LogicCanvas *>(this));
     metrics.SetFont(wxFont(wxFontInfo(10).FaceName("Microsoft YaHei UI")));
     for (const auto &part : c.parts) {
@@ -127,30 +128,27 @@ std::vector<LogicCanvas::DiagnosticMarker> LogicCanvas::diagnosticMarkers() cons
         const auto name = (part.label.empty() ? std::string{} : part.label + " · ") +
                           (part.kind == "Subcircuit" ? part.circuit : part.kind);
         const auto nameSize = metrics.GetTextExtent(U(name));
-        double halfWidth = std::max(size.x / 2 + 3, nameSize.x / 2.0);
-        double top = -size.y / 2 - 24, bottom = size.y / 2 + 12 + nameSize.y;
-        if (part.kind == "Text") halfWidth = std::max(halfWidth, 60.0 + nameSize.x);
+        if (part.kind == "Text") {
+            Point extent{60.0 + nameSize.x, 30.0 + nameSize.y};
+            if (part.rotation % 2) std::swap(extent.x, extent.y);
+            protect(part.at - extent, part.at + extent, FromDIP(4));
+            continue;
+        }
+        const auto [lo, hi] = symbolBounds(project, part, size);
+        const double center = (lo.x + hi.x) / 2;
+        protect(lo, hi, FromDIP(4));
+        const double labelBottom = lo.y - symbolLabelGap;
+        protect({center - nameSize.x / 2.0, labelBottom - nameSize.y},
+                {center + nameSize.x / 2.0, labelBottom}, FromDIP(4));
         const auto pins = ports(project, part);
         if (!pins.empty()) {
             auto output = std::find_if(pins.begin(), pins.end(), [](const Port &pin) { return pin.output; });
             if (output == pins.end()) output = pins.begin();
             const auto value = metrics.GetTextExtent(U(owner->read({part.id, output->id}).text()));
-            halfWidth = std::max(halfWidth, std::min(130.0, double(value.x)) / 2);
+            const double halfWidth = std::min(130.0, double(value.x)) / 2;
+            const double valueTop = hi.y + symbolValueGap;
+            protect({center - halfWidth, valueTop}, {center + halfWidth, valueTop + value.y}, FromDIP(4));
         }
-        if (part.kind == "Subcircuit")
-            for (const auto &shape : project.circuit(part.circuit).shapes)
-                if (shape.appearance) {
-                    const auto b = shapeBounds(shape);
-                    halfWidth = std::max({halfWidth, std::abs(b.first.x) + shape.stroke,
-                                         std::abs(b.second.x) + shape.stroke});
-                    top = std::min(top, b.first.y - shape.stroke - 24);
-                    bottom = std::max(bottom, b.second.y + shape.stroke + 12 + nameSize.y);
-                }
-        auto rotated = [&](Point point) {
-            for (int turn = 0; turn < part.rotation; ++turn) point = {-point.y, point.x};
-            return part.at + point;
-        };
-        protect(rotated({-halfWidth, top}), rotated({halfWidth, bottom}), FromDIP(4));
         for (const auto &pin : pins) protect(part.at + pin.at, part.at + pin.at, FromDIP(11));
     }
     for (const auto &node : c.nodes) {

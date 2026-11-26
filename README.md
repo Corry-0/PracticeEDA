@@ -4,9 +4,21 @@ C++17 / wxWidgets 桌面数字电路编辑器，当前版本 0.5，提供七类�
 
 个人发布仓库：[Corry-0/PracticeEDA](https://github.com/Corry-0/PracticeEDA)。
 
-支持画布拖拽、60 种元件/注释、元件旋转、参数化逻辑门与选择器、1–32 位总线和任意位分组、独立时钟、可配置 RAM/ROM、子电路实例实时调试、自定义元件及跨工程复用、组合逻辑化简与自动生成电路、网表与 `.circ` 交换、项目保存加载、自动保存与崩溃恢复、PNG/打印、撤销重做、剪贴板与错误定位。
+支持画布拖拽、60 种元件/注释、元件旋转、参数化逻辑门与选择器、1–32 位总线和任意位分组、独立时钟、可配置 RAM/ROM、子电路实例实时调试、自定义元件及跨工程复用、组合逻辑化简与自动生成电路、网表导出与 `.circ` 导入、项目保存加载、自动保存与崩溃恢复、PNG/打印、撤销重做、剪贴板与错误定位。
 
 工具栏、分类树和常用元件栏已加入图标，复用了 `wxWidgets/samples` 中的资源，并补充数字逻辑符号。所有图标内嵌程序，支持高 DPI 缩放。
+
+## AI 数字电路助手
+
+Windows Release 编辑器的画布右上方有 **AI 助手**。打开 **模型设置**，选择 DeepSeek 或 OpenAI，再选择模型。可输入仅本次运行使用的 API Key，也可设置对应环境变量后重新启动软件。点击 **保存并测试** 会向选中的服务发送一次不含工程内容的工具调用测试。
+
+| 服务商 | 聊天端点 | 密钥环境变量 |
+|---|---|---|
+| DeepSeek | `https://api.deepseek.com/chat/completions` | `DEEPSEEK_API_KEY` |
+| OpenAI | `https://api.openai.com/v1/chat/completions` | `OPENAI_API_KEY` |
+| 自定义 | 用户填写的完整 HTTPS Chat Completions 端点 | `PRACTICEEDA_AI_API_KEY` |
+
+打开半加器并选中进位线，输入“这根线连接哪些端口？”。助手按需发送当前视图的元件、网络和仿真数据，可点击返回的对象 ID 定位。输入“生成一个半加器，输出 Sum 和 Carry”可预览新子电路及目标真值表。局部修复支持单驱动组合电路，整理导线需先选中目标。点击 **应用候选** 会形成一次可撤销的编辑。时序实例支持运行态查询。已画好的电路可选中导线或元件，按 Ctrl+Shift+R 重排关联导线，让跨线断口避开折点。
 
 ## 运行
 
@@ -21,17 +33,20 @@ C++17 / wxWidgets 桌面数字电路编辑器，当前版本 0.5，提供七类�
 - `examples/half-adder-physical.*`：实体芯片映射、标准网表及配套未布线 KiCad 板。
 - `examples/circ-limited.circ`：外部电路 2.7 受限导入示例，含逻辑门、复用器、寄存器和未支持元件。
 - `examples/drawn-half-adder.component.json`：带自定义符号外观的可运行半加器。
-- `examples/half-adder.component.json`：可通过“项目 → 导入自定义元件”复用的半加器。
+- `examples/half-adder.component.json`：可通过“文件 → 导入 → 自定义元件”复用的半加器。
 
-工程使用 `.logic.json`，独立元件使用 `.component.json`；格式仍为 version 1，旧示例可读取。支持 Logisim 2.7.1 `.circ` 的[导入与导出](docs/CIRC_IMPORT_CN.md)，无法映射的导入对象保留文字诊断；导出不能保持语义的器件会明确拒绝。真值表支持最多 10 位输入，卡诺图支持最多 4 个变量；化简搜索达到预算时提供等价结果并注明未证明最少项。
+工程使用 `.logic.json`，独立元件使用 `.component.json`；格式仍为 version 1，旧示例可读取。支持 Logisim 2.7.1 `.circ` 的[导入](docs/CIRC_IMPORT_CN.md)，无法映射的对象保留文字诊断。真值表支持最多 10 位输入，卡诺图支持最多 4 个变量；化简搜索达到预算时提供等价结果并注明未证明最少项。
 
 ## 新增功能
 
+- **案例 → 实验案例**：提供半加器、全加器、8 位总线寄存器、4 位计数器、RAM 读写、层次化半加器，以及用独立 D 触发器搭成的 4 位并联寄存器、4 位串联移位寄存器。打开可编辑副本后，可对照说明查看预期结果。Ctrl+S 可另存工程。
 - **帮助 → 操作指南**：原画布旁的七条操作提示迁入独立窗口；保留“数字逻辑使用说明”。
 - **真实实例调试**：双击子电路进入所点击的运行实例，面包屑与“返回上级”保留父工程的时间、寄存器及 RAM；“编辑定义（复位）”单独进入可修改模式。
 - **元件与存储配置**：门输入数及逐脚反相、选择位数、总线位段、零/符号扩展、时钟高低节拍和相位、下降沿触发、模计数与装载、RAM/ROM 地址容量均可设置；存储器有十六进制初值编辑和实例运行内存查看。
+- **时钟与波形**：选中 Clock 后可输入频率和占空比，预览按工程时间分辨率换算的实际值。首次运行或单步推进时序电路时自动打开波形窗，支持多路信号、双游标测量和独立播放速度。详见 [时钟频率与时序波形](docs/DIGITAL_LOGIC_CN.md#时钟频率与时序波形)。
 - **组合分析闭环**：真值表输出可编辑为 0、1、设计不关心项；展示化简式、格雷码卡诺图和圈组，生成与/或/非或仅 NAND 的新子电路，并重新仿真逐行验证。
-- **调试与交付**：按输出信号选择连续 CSV 日志；最近工程、空白/半加器模板、右键菜单、可选比例 PNG、全部定义批量 PNG、打印预览和打印。
+- **调试与交付**：按输出信号选择连续 CSV 日志；最近工程、空白/半加器模板、右键菜单、可选比例 PNG、全部定义批量 PNG。
+- **文件操作分组**：“文件 → 导入”集中提供 `.circ`、自定义元件和真值表 CSV；“文件 → 导出”集中提供完整/批量 PNG、最近分析 CSV、逻辑网表 JSON、KiCad PCB 及自定义元件。顶部工具栏从左到右为新建/打开/保存、相邻的导入/导出下拉按钮、选择/导线及常用元件。
 
 - **画布与属性交互**：全部内置元件采用边框端子，移除外伸引线；元件库图标、画布、放置预览和导出共用绘制。输入输出使用 28×28 主体和五种实时状态色；放置一次后自动回到选择模式，靠近引脚仍可直接布线。
 - **局部智能布线**：新建导线按引脚方向出线并绕开主体，不同网络保持走线间距；移动或新放元件后只调整受影响的导线。支持 `Ctrl+Shift+R` 重排选中导线、选中后拖动线段、`Alt+单击` / `Tab` 切换重叠候选，以及交叉断口。打开旧工程保持原布局，纯走线调整保留仿真状态。详见 [布线说明](docs/ROUTING_CN.md)。
@@ -41,12 +56,12 @@ C++17 / wxWidgets 桌面数字电路编辑器，当前版本 0.5，提供七类�
 - **图形工具与元件外观**：直线、曲线、矩形、椭圆、圆，支持线宽、填充、控制点调整、复制及撤销。选择“工具 → 编辑元件外观”设计实例符号，选择“工具 → 返回电路编辑”继续内部逻辑。详见[操作说明](docs/CUSTOM_COMPONENTS_NETLIST_CN.md#图形与元件外观)。
 
 
-- **文件 → 打开 / 导出 Logisim 2.7 `.circ`**：交换支持范围内的元件、参数、连线和层次实例。导出采用真实 Logisim 元件与 Tunnel 网络，会重新安排布局；输入交互值、相位及外观等差异在导出说明中列出，详见 [中文交换说明](docs/CIRC_IMPORT_CN.md)。
+- **文件 → 导入 → Logisim 2.7 电路**：导入支持范围内的元件、参数、连线和层次实例。导入后使用 `.logic.json` 保存，详见 [中文导入说明](docs/CIRC_IMPORT_CN.md)。“文件 → 打开”和命令行仍可读取 `.circ`。
 
 - **项目 → 新建自定义元件**：填写元件名称与输入/输出接口（如 `DATA:8`），然后在画布实现内部逻辑。切回 `main`，从“自定义元件 / 子电路”库放置实例；双击实例观察实际运行状态，修改结构请进入定义编辑。自定义符号接口坐标按稳定 ID 保存，可单独安排位置。
-- **项目 → 保存当前电路为元件 / 导入自定义元件**：保存独立 `.component.json`，自动携带嵌套依赖。导入不会覆盖已有定义，重名自动添加后缀，支持撤销重做。
-- **文件 → 导出网表**：导出当前电路及嵌套实例。`.net` 为 KiCad S-expression 逻辑连接网表，总线按位展开；`.net.json` 保留位宽、实例路径、接口、初值、存储器数据、网络标签和连接别名。导出不会改变运行中的仿真状态。
-- **KiCad 实体映射网表**：另选第三种导出格式，将支持的单比特组合门映射为真实 74HC DIP 芯片，同时生成标准 `.net`、配套 `.kicad_pcb` 和引脚映射表。实际加载及范围见 [PCB 交换说明](docs/PCB_EXCHANGE_CN.md)。
+- **文件 → 导出 → 当前电路为自定义元件 / 文件 → 导入 → 自定义元件**：保存独立 `.component.json`，自动携带嵌套依赖。导入不会覆盖已有定义，重名自动添加后缀，支持撤销重做。
+- **文件 → 导出 → 逻辑网表 JSON**：保存为 `circuit.json`，包含当前电路及嵌套实例的连接、位宽、器件参数、初值、存储器数据、网络标签和连接别名，供程序读取和分析。导出保留运行中的仿真状态；继续编辑设计请保存 `.logic.json` 工程。
+- **文件 → 导出 → KiCad PCB**：将支持的单比特组合门映射为真实 74HC DIP 芯片，保存 `circuit.kicad_pcb`，同时生成 `circuit.net` 和 `circuit.mapping.json`。在 KiCad PCB 编辑器打开板文件继续布局和布线。实际加载及范围见 [PCB 交换说明](docs/PCB_EXCHANGE_CN.md)。
 
 具体格式、使用边界与示例见 [自定义元件与网表说明](docs/CUSTOM_COMPONENTS_NETLIST_CN.md)。
 
@@ -78,14 +93,13 @@ ctest --test-dir build-core -C Debug --output-on-failure
 | --- | --- |
 | `include/Digital.h`、`src/Digital.cpp` | 数字电路、仿真、子电路、文件格式、历史与分析 |
 | `src/CircImport.cpp`、`tests/circ_import_tests.cpp` | 外部电路 2.7 XML 受限转换、原生校验复用及导入回归 |
-| `include/CircExchange.h`、`src/CircExport.cpp` | 经典 Logisim 导出、真实元件几何、层次和语义差异说明 |
 | `include/LogicAnalysis.h`、`src/LogicAnalysis.cpp` | 布尔化简、卡诺图、CSV 分析表与电路生成/反向验证 |
 | `include/PcbExport.h`、`src/PcbExport.cpp` | 受限真实芯片/封装映射，标准网表与配套 PCB |
 | `src/CustomComponents.cpp` | 自定义接口创建、依赖打包、导入重命名与 ID 重映射 |
 | `include/LogicSupport.h`、`src/LogicSupport.cpp` | 画布几何、导线基础类型、文件读写 |
 | `include/WxSupport.h` | wxWidgets 字符和路径转换 |
 | `include/DigitalEditor.h`、`src/DigitalEditor.cpp` | 数字编辑器界面、交互与 GUI 检查 |
-| `src/LogicEditorTools.cpp` | 初值/运行内存、引脚布局、持续日志、打印及批量图片窗口 |
+| `src/LogicEditorTools.cpp` | 初值/运行内存、引脚布局、持续日志及批量图片窗口 |
 | `src/LogicDiagnostics.cpp` | ERC 颜色提示、外围警示图标避让、悬停详情与按需问题窗口 |
 | `include/LogicRouting.h`、`src/LogicRouting.cpp` | 正交避障、不同网络间距、局部重排和交叉计算 |
 | `src/LogicWireTools.cpp`、`tests/routing_tests.cpp` | 画布布线交互、线段拖动、候选切换和路由回归 |
@@ -119,3 +133,4 @@ ctest --test-dir build-core -C Debug --output-on-failure
 本仓库保留 [LEVE1012/ElectronicComponent_Practice-](https://github.com/LEVE1012/ElectronicComponent_Practice-) 的原型提交历史，在此基础上整理和扩展为当前 PracticeEDA。历史提交作者与第三方资源署名保持原样；第三方许可文本见 `third_party/`，图标来源见 [资源说明](resources/ICONS.md)。
 
 当前以数字逻辑为主，PCB 仅提供上述受限实体映射，板未布线；不含模拟电路求解和制造验收。分发包静态链接 wxWidgets，Windows 目标机器仍需 Microsoft Visual C++ x64 运行库。
+

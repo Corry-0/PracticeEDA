@@ -1,0 +1,346 @@
+{
+  "circuits": [
+    {
+      "interfaceLayout": {},
+      "name": "main",
+      "nodes": [],
+      "parts": [
+        {
+          "at": [
+            100.0,
+            100.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "D",
+          "kind": "Input",
+          "label": "D",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            100.0,
+            270.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "CLK",
+          "kind": "Clock",
+          "label": "CLK",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            100.0,
+            440.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "CLR",
+          "kind": "Input",
+          "label": "CLR",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            440.0,
+            100.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "UP",
+          "kind": "Register",
+          "label": "上升沿寄存器",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            440.0,
+            400.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "DOWN",
+          "kind": "Register",
+          "label": "下降沿寄存器",
+          "params": {
+            "falling": 1
+          },
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            760.0,
+            100.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "Q_UP",
+          "kind": "Output",
+          "label": "Q_UP",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            760.0,
+            400.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "Q_DOWN",
+          "kind": "Output",
+          "label": "Q_DOWN",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        },
+        {
+          "at": [
+            760.0,
+            250.0
+          ],
+          "bitGroups": [],
+          "circuit": "",
+          "data": [],
+          "id": "CLK_VIEW",
+          "kind": "Output",
+          "label": "CLK",
+          "params": {},
+          "rotation": 0,
+          "value": 0,
+          "width": 1
+        }
+      ],
+      "shapes": [],
+      "wires": [
+        {
+          "a": [
+            "D",
+            "Y"
+          ],
+          "b": [
+            "UP",
+            "D"
+          ],
+          "bends": [
+            [
+              130.0,
+              100.0
+            ],
+            [
+              130.0,
+              90.0
+            ]
+          ],
+          "id": "w1"
+        },
+        {
+          "a": [
+            "D",
+            "Y"
+          ],
+          "b": [
+            "DOWN",
+            "D"
+          ],
+          "bends": [
+            [
+              370.0,
+              100.0
+            ],
+            [
+              370.0,
+              390.0
+            ]
+          ],
+          "id": "w2"
+        },
+        {
+          "a": [
+            "CLK",
+            "Y"
+          ],
+          "b": [
+            "UP",
+            "CLK"
+          ],
+          "bends": [
+            [
+              140.0,
+              270.0
+            ],
+            [
+              140.0,
+              110.0
+            ]
+          ],
+          "id": "w3"
+        },
+        {
+          "a": [
+            "CLK",
+            "Y"
+          ],
+          "b": [
+            "DOWN",
+            "CLK"
+          ],
+          "bends": [
+            [
+              140.0,
+              270.0
+            ],
+            [
+              140.0,
+              410.0
+            ]
+          ],
+          "id": "w4"
+        },
+        {
+          "a": [
+            "CLK",
+            "Y"
+          ],
+          "b": [
+            "CLK_VIEW",
+            "A"
+          ],
+          "bends": [
+            [
+              140.0,
+              270.0
+            ],
+            [
+              140.0,
+              250.0
+            ]
+          ],
+          "id": "w5"
+        },
+        {
+          "a": [
+            "CLR",
+            "Y"
+          ],
+          "b": [
+            "UP",
+            "CLR"
+          ],
+          "bends": [
+            [
+              130.0,
+              440.0
+            ],
+            [
+              130.0,
+              304.0
+            ],
+            [
+              360.0,
+              304.0
+            ],
+            [
+              360.0,
+              130.0
+            ]
+          ],
+          "id": "w6"
+        },
+        {
+          "a": [
+            "CLR",
+            "Y"
+          ],
+          "b": [
+            "DOWN",
+            "CLR"
+          ],
+          "bends": [
+            [
+              130.0,
+              440.0
+            ],
+            [
+              130.0,
+              430.0
+            ]
+          ],
+          "id": "w7"
+        },
+        {
+          "a": [
+            "UP",
+            "Q"
+          ],
+          "b": [
+            "Q_UP",
+            "A"
+          ],
+          "bends": [
+            [
+              510.0,
+              110.0
+            ],
+            [
+              510.0,
+              100.0
+            ]
+          ],
+          "id": "w8"
+        },
+        {
+          "a": [
+            "DOWN",
+            "Q"
+          ],
+          "b": [
+            "Q_DOWN",
+            "A"
+          ],
+          "bends": [
+            [
+              510.0,
+              410.0
+            ],
+            [
+              510.0,
+              400.0
+            ]
+          ],
+          "id": "w9"
+        }
+      ]
+    }
+  ],
+  "format": "PracticeEDA.logic",
+  "main": "main",
+  "name": "时序演示 01：上升沿、下降沿与异步清零",
+  "nextId": 10,
+  "version": 1
+}

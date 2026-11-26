@@ -79,6 +79,37 @@ std::string blockName(const Part &p) {
 }
 } // namespace
 
+std::pair<Point, Point> symbolBounds(const Project &project, const Part &part, Point size) {
+    Point lo = size * -.5, hi = size * .5;
+    if (part.kind == "Subcircuit")
+        for (const auto &shape : project.circuit(part.circuit).shapes)
+            if (shape.appearance) {
+                const auto [min, max] = shapeBounds(shape);
+                const double halfStroke = shape.stroke / 2;
+                lo.x = std::min(lo.x, min.x - halfStroke);
+                lo.y = std::min(lo.y, min.y - halfStroke);
+                hi.x = std::max(hi.x, max.x + halfStroke);
+                hi.y = std::max(hi.y, max.y + halfStroke);
+            }
+    for (int turn = 0; turn < part.rotation; ++turn) {
+        const Point nextLo{-hi.y, lo.x};
+        hi = {-lo.y, hi.x};
+        lo = nextLo;
+    }
+    // 四分之一转后，原来位于引脚两侧的位宽文字会移到主体的上下方。
+    if (part.rotation % 2) {
+        constexpr double pinWidthLabelExtent = 24;
+        for (const auto &pin : ports(project, part))
+            if (pin.width > 1) {
+                if (pin.at.y < 0)
+                    lo.y = std::min(lo.y, pin.at.y - pinWidthLabelExtent);
+                else if (pin.at.y > 0)
+                    hi.y = std::max(hi.y, pin.at.y + pinWidthLabelExtent);
+            }
+    }
+    return {part.at + lo, part.at + hi};
+}
+
 void drawShape(wxGraphicsContext &g, const Shape &s, bool selected, bool preview, double zoom) {
     g.PushState();
     g.SetPen(wxPen(wxColour(selected || preview ? "#6366f1" : "#26384b"), s.stroke,
@@ -136,6 +167,7 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
     const bool triangle = k == "Not" || k == "Buffer" || k == "TriState";
     const bool andGate = k == "And" || k == "Nand";
     const bool orGate = k == "Or" || k == "Nor" || k == "Xor" || k == "Xnor";
+    const bool exclusiveGate = k == "Xor" || k == "Xnor";
     const bool inverted = k == "Not" || k == "Nand" || k == "Nor" || k == "Xnor";
     const bool fan = k == "Splitter" || k == "Joiner";
     const bool io = k == "Input" || k == "Output";
@@ -180,19 +212,24 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
         g.DrawPath(p);
     } else if (orGate) {
         const double tip = inverted ? 30 : 40;
+        // 异或外弧沿用原来的端口坐标，主体后沿平行右移。
+        const double gap = exclusiveGate ? 10 : 0;
+        const double back = -40 + gap;
         auto p = g.CreatePath();
-        p.MoveToPoint(-40, -h / 2);
+        p.MoveToPoint(back, -h / 2);
         p.AddCurveToPoint(-3, -h / 2, tip - 14, -h * .37, tip, 0);
-        p.AddCurveToPoint(tip - 14, h * .37, -3, h / 2, -40, h / 2);
-        p.AddQuadCurveToPoint(-12, 0, -40, -h / 2);
+        p.AddCurveToPoint(tip - 14, h * .37, -3, h / 2, back, h / 2);
+        p.AddQuadCurveToPoint(-12 + gap, 0, back, -h / 2);
         p.CloseSubpath();
         g.DrawPath(p);
-        if (k == "Xor" || k == "Xnor") {
-            // 第二条异或曲线置于主体内，不在输入端产生一段外伸引线。
+        if (exclusiveGate) {
             auto extra = g.CreatePath();
-            extra.MoveToPoint(-32, -h / 2 + 7);
-            extra.AddQuadCurveToPoint(-6, 0, -32, h / 2 - 7);
+            extra.MoveToPoint(-40, -h / 2);
+            extra.AddQuadCurveToPoint(-12, 0, -40, h / 2);
             g.StrokePath(extra);
+            for (const auto &pin : pp)
+                if (!pin.output)
+                    g.StrokeLine(pin.at.x, pin.at.y, pin.at.x + gap, pin.at.y);
         }
     } else if (trapezoid) {
         if (k == "Mux")
@@ -371,23 +408,24 @@ void drawSymbol(wxGraphicsContext &g, const Project &project, const Part &part,
     }
     if (fan && annotations)
         label(g, k == "Splitter" ? "SPLIT" : "JOIN", 0, -h / 2 + 4, 9, ink, 0, size.x - 12);
+    g.PopState();
+
+    // 元件外的说明按画布坐标绘制，主体和引脚继续使用旋转后的坐标。
     if (annotations) {
         auto name = (block && !custom) || fan ? std::string{} : blockName(part);
         if (!part.label.empty())
             name = name.empty() ? part.label : part.label + " · " + name;
-        double labelTop = -h / 2 - 24, valueBottom = h / 2 + 12;
-        if (custom)
-            for (const auto &s : project.circuit(part.circuit).shapes)
-                if (s.appearance) {
-                    auto b = shapeBounds(s);
-                    labelTop = std::min(labelTop, b.first.y - s.stroke / 2 - 24);
-                    valueBottom = std::max(valueBottom, b.second.y + s.stroke / 2 + 12);
-                }
-        if (!name.empty())
-            label(g, name, 0, labelTop, 10, ink);
+        const auto [lo, hi] = symbolBounds(project, part, size);
+        const double center = (lo.x + hi.x) / 2;
+        if (!name.empty()) {
+            g.SetFont(wxFont(wxFontInfo(10).FaceName("Microsoft YaHei UI")), ink);
+            const auto nameText = U(name);
+            double width = 0, height = 0;
+            g.GetTextExtent(nameText, &width, &height);
+            g.DrawText(nameText, center - width / 2, lo.y - symbolLabelGap - height);
+        }
         if (!preview && !pp.empty() && (!compact || k == "Clock" || k == "LED" || (io && part.width > 1)))
-            label(g, value.text(), 0, valueBottom, 9, liveColour, 0, 130);
+            label(g, value.text(), center, hi.y + symbolValueGap, 9, liveColour, 0, 130);
     }
-    g.PopState();
 }
 } // namespace eda::logic

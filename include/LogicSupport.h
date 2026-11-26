@@ -44,6 +44,8 @@ struct Wire {
 };
 struct Issue {
     std::string severity, object, message;
+    std::string rule{};
+    int network = -1; // 当前仿真器内有效，与 Simulator::network() 使用同一编号。
 };
 std::vector<Point> orthogonal(const std::vector<Point> &points);
 std::string readFile(const std::filesystem::path &path);

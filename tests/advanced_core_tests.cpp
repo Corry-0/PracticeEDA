@@ -106,9 +106,36 @@ void timingAndMemory() {
     c.wire(enable, "Y", other, "EN");
     Simulator sim(c.p, "main");
     sim.settle();
+    check(sim.hasTimingDevices() && sim.network({clock, "Y"}) == sim.network({counter, "CLK"}),
+          "waveform aliases use the compiled net");
+    check(!sim.network({"missing", "Y"}), "missing waveform endpoint");
+    size_t traces = 0;
+    std::vector<uint64_t> clockEdges;
+    const auto clockNetwork = *sim.network({clock, "Y"});
+    sim.setTraceSink([&](const Trace &) { ++traces; });
+    sim.setNetworkSink([&](int network, uint64_t tick, uint64_t, const Signal &signal) {
+        if (network == clockNetwork && signal == Signal::number(1, 1)) clockEdges.push_back(tick);
+    });
     for (int i = 0; i < 8; ++i)
         sim.tick();
     check(value(sim, counter, "Q", 4) && value(sim, other, "Q", 2), "independent clock periods");
+    check(clockEdges == std::vector<uint64_t>{1, 3, 5, 7} && traces >= 8,
+          "waveform clock edges and driver trace coexist");
+    auto settings = quantizeClock(800, 50, defaultTickDurationNs);
+    check(settings.highTicks == 2 && settings.lowTicks == 1 &&
+              std::abs(settings.frequencyHz(defaultTickDurationNs) - 666.6666667) < 1e-6,
+          "quantized frequency reports its effective value");
+    bool invalidClock = false;
+    try { quantizeClock(2000, 50, defaultTickDurationNs); }
+    catch (const std::runtime_error &) { invalidClock = true; }
+    check(invalidClock, "unrepresentable clock rate rejected");
+    const auto legacy = serialize(c.p);
+    check(legacy.find("tickDurationNs") == std::string::npos &&
+              deserialize(legacy).tickDurationNs == defaultTickDurationNs, "old timing defaults");
+    c.p.tickDurationNs = 250000;
+    const auto saved = deserialize(serialize(c.p));
+    check(saved.tickDurationNs == 250000 && clockTiming(*saved.circuit("main").part(slow)).highTicks == 2,
+          "time resolution round-trips without changing clock ticks");
     for (int i = 0; i < 12; ++i)
         sim.tick();
     check(value(sim, counter, "Q", 0), "modulo-ten counter wraps");

@@ -434,7 +434,32 @@ void erase(Circuit &c, const std::set<std::string> &ids) {
 }
 // 加载/编译前统一校验整个工程：规模上限、ID 唯一且合法、位宽/坐标范围、
 // 子电路引用存在且无递归、输入/输出名称不重复等。
+double ClockTiming::frequencyHz(uint32_t tickDurationNs) const {
+    return 1e9 / (double(tickDurationNs) * double(highTicks + lowTicks));
+}
+double ClockTiming::dutyPercent() const {
+    return 100.0 * double(highTicks) / double(highTicks + lowTicks);
+}
+ClockTiming clockTiming(const Part &part) {
+    return {parameter(part, "highTicks", 1), parameter(part, "lowTicks", 1)};
+}
+ClockTiming quantizeClock(double frequencyHz, double dutyPercent, uint32_t tickDurationNs) {
+    if (!std::isfinite(frequencyHz) || frequencyHz <= 0 || !std::isfinite(dutyPercent) ||
+        dutyPercent <= 0 || dutyPercent >= 100 || tickDurationNs < 1 || tickDurationNs > 1000000000)
+        throw std::runtime_error("请输入正频率和 0–100% 之间的占空比");
+    const double duration = 1e9 / (frequencyHz * tickDurationNs);
+    if (duration < 2.0 - 1e-10 || duration >= 2.0 * maxClockLevelTicks + 0.5)
+        throw std::runtime_error("该频率超出当前时间分辨率的范围，请调整频率或每拍时长");
+    const auto period = std::llround(duration);
+    const auto high = std::llround(double(period) * dutyPercent / 100.0);
+    const auto low = period - high;
+    if (high < 1 || high > maxClockLevelTicks || low < 1 || low > maxClockLevelTicks)
+        throw std::runtime_error("高低电平各需 1–1000000 拍，请调整占空比或每拍时长");
+    return {high, low};
+}
 void Project::validate() const {
+    if (tickDurationNs < 1 || tickDurationNs > 1000000000)
+        throw std::runtime_error("仿真每拍时长须为 1–1000000000 纳秒");
     // 在加载或编译工程前，校验所有定义（包括未被使用的定义）。
     if (circuits.empty() || circuits.size() > 128)
         throw std::runtime_error("电路数量应为 1–128");
@@ -502,8 +527,8 @@ void Project::validate() const {
             range("inputWidth", 1, 1, 32);
             range("outputWidth", 1, 1, 32);
             range("addressBits", 8, 1, 16);
-            range("highTicks", 1, 1, 1000000);
-            range("lowTicks", 1, 1, 1000000);
+            range("highTicks", 1, 1, maxClockLevelTicks);
+            range("lowTicks", 1, 1, maxClockLevelTicks);
             range("phase", 0, 0, 1000000000);
             range("counterMax", mask(p.width), 0, mask(p.width));
             range("rows", 8, 1, 32);
@@ -587,6 +612,8 @@ std::string serialize(const Project &p) {
               {"main", p.main},
               {"nextId", p.nextId},
               {"circuits", json::array()}};
+    if (p.tickDurationNs != defaultTickDurationNs)
+        j["tickDurationNs"] = p.tickDurationNs;
     for (auto &c : p.circuits) {
         json q = {
             {"name", c.name}, {"parts", json::array()}, {"nodes", json::array()}, {"wires", json::array()}};
@@ -639,6 +666,8 @@ Project deserialize(const std::string &text) {
     p.name = j.at("name");
     p.main = j.at("main");
     p.nextId = integer(j.at("nextId"), 1000000000000ULL);
+    if (j.contains("tickDurationNs"))
+        p.tickDurationNs = uint32_t(integer(j.at("tickDurationNs"), 1000000000));
     p.circuits.clear();
     for (auto &q : j.at("circuits")) {
         Circuit c;
@@ -1031,7 +1060,9 @@ struct Simulator::Impl {
     std::map<uint64_t, std::set<size_t>> queue;
     std::vector<Trace> traces;
     std::function<void(const Trace &)> traceSink;
+    NetworkSink networkSink;
     bool hasSwitches = false;
+    bool hasTiming = false;
     uint64_t now = 0;
     uint64_t ticks = 0;          // 累计时钟半周期数（tick() 被调用的次数）
     bool oscillating = false;
@@ -1131,6 +1162,7 @@ struct Simulator::Impl {
         for (size_t i = 0; i < nodes.size(); ++i) {
             auto &n = nodes[i];
             hasSwitches = hasSwitches || switchKind(n.part.kind);
+            hasTiming = hasTiming || sequential(n.part.kind);
             for (auto &port : ports(project, n.part)) {
                 int net = roots.at(n.path + ":" + port.id);
                 n.nets[port.id] = net;
@@ -1790,15 +1822,20 @@ struct Simulator::Impl {
             for (size_t i = 0; i < nets.size(); ++i)
                 affected.insert(int(i));
         }
+        std::vector<int> changedNetworks;
         for (auto i : affected) {
             auto &net = nets[i];
             auto s = hasSwitches ? switched[i] : resolve(net);
             if (s != net.signal) {
                 net.signal = s;
+                if (networkSink)
+                    changedNetworks.push_back(i);
                 for (auto user : net.users)
                     queue[now + 1].insert(user);
             }
         }
+        for (auto i : changedNetworks)
+            networkSink(i, ticks, now, nets[i].signal);
         return true;
     }
 };
@@ -1887,24 +1924,42 @@ std::string Simulator::text(const std::string &path) const {
 void Simulator::setTraceSink(std::function<void(const Trace &)> sink) {
     impl->traceSink = std::move(sink);
 }
+std::optional<int> Simulator::network(const Endpoint &endpoint) const {
+    const auto found = impl->roots.find(endpoint.key());
+    if (found == impl->roots.end())
+        return std::nullopt;
+    return found->second;
+}
+void Simulator::setNetworkSink(NetworkSink sink) {
+    impl->networkSink = std::move(sink);
+}
+bool Simulator::hasTimingDevices() const {
+    return impl->hasTiming;
+}
 std::vector<Issue> Simulator::issues() const {
     std::vector<Issue> result;
-    for (auto &n : impl->nets) {
-        std::string message;
-        if (n.mismatch)
+    for (size_t i = 0; i < impl->nets.size(); ++i) {
+        const auto &n = impl->nets[i];
+        std::string message, rule;
+        if (n.mismatch) {
+            rule = "WIDTH";
             message = "总线位宽不匹配";
-        else if (n.signal.error)
+        } else if (n.signal.error) {
+            rule = "DRIVE_OR_OPERATION";
             message = "驱动冲突或非法运算 (E)";
-        else if (n.signal.z && !n.users.empty() && !n.optionalOnly)
+        } else if (n.signal.z && !n.users.empty() && !n.optionalOnly) {
+            rule = "HIGH_IMPEDANCE";
             message = "输入悬空 / 高阻态 (Z)";
-        else if (!n.signal.defined() && !n.users.empty() && !n.optionalOnly)
+        } else if (!n.signal.defined() && !n.users.empty() && !n.optionalOnly) {
+            rule = "UNKNOWN";
             message = "输入包含未知值 (X)";
+        }
         if (!message.empty())
-            for (auto &object : n.objects)
-                result.push_back({n.mismatch || n.signal.error ? "error" : "warning", object, message});
+            for (const auto &object : n.objects)
+                result.push_back({n.mismatch || n.signal.error ? "error" : "warning", object, message, rule, int(i)});
     }
     for (auto &obj : impl->oscillators)
-        result.push_back({"error", obj, "事件预算耗尽：电路振荡或传播过长；请复位后检查反馈"});
+        result.push_back({"error", obj, "事件预算耗尽：电路振荡或传播过长；请复位后检查反馈", "EVENT_BUDGET"});
     return result;
 }
 const std::vector<Trace> &Simulator::trace() const {

@@ -6,8 +6,6 @@
 #include <wx/dirdlg.h>
 #include <wx/choicdlg.h>
 #include <wx/textdlg.h>
-#include <wx/print.h>
-#include <wx/printdlg.h>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -25,14 +23,6 @@ uint32_t hexValue(const wxString &value) {
     if(used!=text.size() || result>UINT32_MAX) throw std::runtime_error("请输入有效的十六进制数（不超过 FFFFFFFF）");
     return uint32_t(result);
 }
-class CircuitPrintout : public wxPrintout {
-    std::function<bool(wxDC*)> draw;
-  public:
-    CircuitPrintout(const wxString &title,std::function<bool(wxDC*)> fn):wxPrintout(title),draw(std::move(fn)) {}
-    bool OnPrintPage(int page) override { return page==1 && GetDC() && draw(GetDC()); }
-    bool HasPage(int page) override { return page==1; }
-    void GetPageInfo(int *min,int *max,int *from,int *to) override { *min=*max=*from=*to=1; }
-};
 }
 
 void LogicEditor::memoryEditor(bool runtime) {
@@ -94,7 +84,22 @@ void LogicEditor::memoryEditor(bool runtime) {
             std::istringstream words(all); std::string word; std::vector<uint32_t> values(capacity,0); size_t address=0;
             while(words>>word) {
                 size_t count=1; auto star=word.find('*');
-                if(star!=std::string::npos) { count=std::stoull(word.substr(0,star)); word=word.substr(star+1); }
+                if(star!=std::string::npos) {
+                    const auto digits=word.substr(0,star);
+                    if(digits.empty() || digits.find_first_not_of("0123456789")!=std::string::npos)
+                        throw std::runtime_error("HEX 重复次数必须为正十进制整数");
+                    // 逐位限额解析，避免溢出、符号及只消费数字前缀。
+                    count=0;
+                    const auto remaining=capacity-address;
+                    for(char digit:digits) {
+                        const auto value=size_t(digit-'0');
+                        if(value>remaining || count>(remaining-value)/10)
+                            throw std::runtime_error("HEX 内容超过当前存储器容量");
+                        count=count*10+value;
+                    }
+                    if(!count) throw std::runtime_error("HEX 重复次数必须大于零");
+                    word=word.substr(star+1);
+                }
                 auto value=hexValue(U(word));
                 if(count>capacity-address) throw std::runtime_error("HEX 内容超过当前存储器容量");
                 for(size_t repeat=0;repeat<count;++repeat) values[address++]=value;
@@ -270,7 +275,7 @@ void LogicEditor::checkRecovery() {
 void LogicEditor::rememberFile(const std::string &path) {
     recentFiles.erase(std::remove(recentFiles.begin(),recentFiles.end(),path),recentFiles.end());
     recentFiles.insert(recentFiles.begin(),path); if(recentFiles.size()>8) recentFiles.resize(8);
-    wxConfig config("PracticeEDA");
+    auto &config = *wxConfigBase::Get();
     for(size_t i=0;i<8;++i) config.Write(U("recent/"+std::to_string(i)),i<recentFiles.size()?U(recentFiles[i]):wxString{});
     config.Flush();
 }
@@ -286,65 +291,48 @@ void LogicEditor::exportBatch() {
     wxTextEntryDialog scaleDialog(this,U("导出比例（0.25–4 倍）"),U("批量 PNG"),"1.5");
     if(scaleDialog.ShowModal()!=wxID_OK) return; double scale;
     if(!scaleDialog.GetValue().ToDouble(&scale)||scale<.25||scale>4) throw std::runtime_error("比例应为 0.25–4");
+    // 先分配整个批次的唯一文件名；Windows 忽略大小写，已有文件也不覆盖。
+    const auto directory=fsPath(folder.GetPath());
+    std::set<wxString> occupied;
+    for(const auto &entry:std::filesystem::directory_iterator(directory))
+        occupied.insert(wxString(entry.path().filename().wstring()).Lower());
+    std::vector<std::filesystem::path> paths;
+    for(const auto &definition:history.project.circuits) {
+        auto name=U(definition.name);
+        for(size_t i=0;i<name.size();++i)
+            if(name[i]<32 || wxString("<>:\"/\\|?*").Find(name[i])!=wxNOT_FOUND) name[i]='_';
+        while(!name.empty() && (name.Last()=='.' || name.Last()==' ')) name.RemoveLast();
+        if(name.empty()) name="circuit";
+        const auto stem=name.BeforeFirst('.').Upper();
+        if(stem=="CON" || stem=="PRN" || stem=="AUX" || stem=="NUL" ||
+           (stem.size()==4 && (stem.StartsWith("COM") || stem.StartsWith("LPT")) &&
+            (wxString("123456789¹²³").Find(stem[3])!=wxNOT_FOUND))) name="_"+name;
+        auto filename=name+".png";
+        for(size_t suffix=2;!occupied.insert(filename.Lower()).second;++suffix)
+            filename=name+"_"+std::to_string(suffix)+".png";
+        paths.push_back(directory/fsPath(filename));
+    }
     // 导出临时定义视图使用独立仿真器；原运行器完整移回，时间、内存与日志均不受影响。
-    bool wasRunning=timer.IsRunning(); stop(); canvas->cancel(); auto savedCurrent=current,savedScope=scope,savedRoot=simulationRoot;
+    bool wasRunning=timer.IsRunning();
+    const auto remaining = batchRemaining, total = batchTotal;
+    stop(); canvas->cancel(); auto savedCurrent=current,savedScope=scope,savedRoot=simulationRoot;
     auto savedNavigation=navigation; auto savedView=canvas->view; bool savedAppearance=canvas->appearance;
     auto savedSimulator=std::move(simulator);
     auto restore=[&] { simulator=std::move(savedSimulator); current=savedCurrent; scope=savedScope;
         simulationRoot=savedRoot; navigation=savedNavigation; canvas->view=savedView;
-        canvas->appearance=savedAppearance; rebuild(false,true); if(wasRunning)timer.Start(500); };
+        canvas->appearance=savedAppearance;
+        if (wasRunning) { batchRemaining = remaining; batchTotal = total; startPlayback(); }
+        rebuild(false,true); };
     try {
+        size_t index=0;
         for(const auto &definition:history.project.circuits) {
             current=definition.name; scope.clear(); canvas->appearance=false;
             simulator=std::make_unique<Simulator>(history.project,current); simulator->settle();
             refreshDiagnostics();
-            std::string name=definition.name;
-            for(auto &c:name) if(std::string("<>:\"/\\|?*").find(c)!=std::string::npos) c='_';
-            auto path=fsPath(folder.GetPath())/std::filesystem::u8path(name+".png");
-            canvas->exportPng(wxString(path.wstring()),scale);
+            canvas->exportPng(wxString(paths[index++].wstring()),scale);
         }
         restore();
     } catch(...) { restore(); throw; }
-}
-
-void LogicEditor::printCircuit(bool preview) {
-    canvas->cancel();
-    auto draw=[this](wxDC *dc) {
-        Point lo{1e9,1e9},hi{-1e9,-1e9};
-        auto add=[&](Point point) { lo.x=std::min(lo.x,point.x);lo.y=std::min(lo.y,point.y);
-            hi.x=std::max(hi.x,point.x);hi.y=std::max(hi.y,point.y); };
-        for(const auto &part:circuit().parts) {
-            auto local=[&](Point point){for(int turn=0;turn<part.rotation;++turn)point={-point.y,point.x};add(part.at+point);};
-            local({-100,-partHeight(history.project,part)/2-40});
-            local({100,partHeight(history.project,part)/2+40});
-            for(const auto &pin:ports(history.project,part)) add(part.at+pin.at);
-            if(part.kind=="Subcircuit")for(const auto &shape:history.project.circuit(part.circuit).shapes)if(shape.appearance){
-                auto box=shapeBounds(shape);local(box.first-Point{30,30});local(box.second+Point{30,30});
-            }
-        }
-        for(const auto &wire:circuit().wires) for(const auto &point:wirePoints(history.project,circuit(),wire)) add(point);
-        for(const auto &shape:circuit().shapes) if(shape.appearance==canvas->appearance) {
-            auto bounds=shapeBounds(shape); add(bounds.first);add(bounds.second);
-        }
-        if(lo.x>hi.x) { lo={0,0};hi={500,300}; }
-        auto size=dc->GetSize(); auto extent=hi-lo; auto saved=canvas->view;
-        canvas->view.zoom=std::min((size.x-120)/std::max(1.0,extent.x),(size.y-160)/std::max(1.0,extent.y));
-        canvas->view.offset=Point{60,80}-lo*canvas->view.zoom;
-        std::unique_ptr<wxGraphicsContext> graphics(wxGraphicsContext::CreateFromUnknownDC(*dc));
-        if(!graphics) { canvas->view=saved; return false; }
-        canvas->render(*graphics,size,true); canvas->view=saved; return true;
-    };
-    wxPrintDialogData data; data.GetPrintData().SetOrientation(wxLANDSCAPE);
-    if(preview) {
-        auto result=new wxPrintPreview(new CircuitPrintout(U(current),draw),new CircuitPrintout(U(current),draw),&data);
-        if(!result->IsOk()) { delete result; throw std::runtime_error("无法创建打印预览，请检查打印机设置"); }
-        auto frame=new wxPreviewFrame(result,this,U("电路打印预览"),wxDefaultPosition,{1100,800});
-        frame->Initialize(); frame->Show();
-    } else {
-        wxPrinter printer(&data); CircuitPrintout printout(U(current),draw);
-        if(!printer.Print(this,&printout,true) && wxPrinter::GetLastError()==wxPRINTER_ERROR)
-            throw std::runtime_error("打印失败，请检查打印机设置");
-    }
 }
 
 void LogicEditor::textDevice() {
@@ -363,3 +351,4 @@ void LogicEditor::textDevice() {
     } else throw std::runtime_error("选中的元件不是 Keyboard、TTY 或 Joystick");
 }
 } // namespace eda::logic
+

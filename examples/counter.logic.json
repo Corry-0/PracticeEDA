@@ -1,0 +1,24 @@
+{
+  "format": "PracticeEDA.logic", "version": 1,
+  "name": "实验案例：4 位同步计数器", "main": "main", "nextId": 100,
+  "circuits": [{
+    "name": "main", "nodes": [],
+    "parts": [
+      {"id":"clk","kind":"Clock","label":"CLK","circuit":"","at":[120,160],"width":1,"value":0,"data":[]},
+      {"id":"en","kind":"Input","label":"EN","circuit":"","at":[120,300],"width":1,"value":1,"data":[]},
+      {"id":"clr","kind":"Input","label":"CLR","circuit":"","at":[120,440],"width":1,"value":0,"data":[]},
+      {"id":"counter","kind":"Counter","label":"4-bit Counter","circuit":"","at":[460,280],"width":4,"value":0,"data":[],"params":{"counterMax":15}},
+      {"id":"q","kind":"Output","label":"Q","circuit":"","at":[820,180],"width":4,"value":0,"data":[]},
+      {"id":"hex","kind":"Hex","label":"Hex Q","circuit":"","at":[820,330],"width":4,"value":0,"data":[]},
+      {"id":"carry","kind":"LED","label":"CARRY","circuit":"","at":[820,480],"width":1,"value":0,"data":[]}
+    ],
+    "wires": [
+      {"id":"w1","a":["en","Y"],"b":["counter","EN"],"bends":[[320,300],[320,260]]},
+      {"id":"w2","a":["clk","Y"],"b":["counter","CLK"],"bends":[[280,160],[280,280]]},
+      {"id":"w3","a":["clr","Y"],"b":["counter","CLR"],"bends":[[350,440],[350,300]]},
+      {"id":"w4","a":["counter","Q"],"b":["q","A"],"bends":[[620,270],[620,180]]},
+      {"id":"w5","a":["counter","Q"],"b":["hex","A"],"bends":[[650,270],[650,330]]},
+      {"id":"w6","a":["counter","CARRY"],"b":["carry","A"],"bends":[[580,290],[580,480]]}
+    ]
+  }]
+}
